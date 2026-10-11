@@ -190,5 +190,26 @@ const solo = await r.evaluate(()=>JSON.stringify({ S: window.__fx.state, P: wind
 await f.addInitScript(data => { window.claude = { hot: { data: JSON.parse(data) } }; }, solo); await f.goto(url); await f.waitForTimeout(300);
 eq((await st(f)).screen,'play','single round restored'); eq(await who(f),'Sam','single player restored'); eq(await f.evaluate(()=>window.__fx.match),null,'no match');
 
+// ---- H. starting fresh: two taps on the high scores screen erase this device's scores and passports, and leave its settings
+const h = await mk(390, 844, 'light');
+await h.click('[data-act=board]'); eq(await h.locator('#fx-wipe').count(),0,'nothing to clear on a new device'); await h.click('[data-act=back]');
+await h.evaluate(() => { const t = Date.now(), row = { name:'Alex', avatar:'🦊', score:1250, streak:9, clock:false, perfect:false, t };
+  localStorage.setItem('fx-tables', JSON.stringify({ world:[row] })); localStorage.setItem('fx-bests', JSON.stringify({ 'world|alex':{ score:1250, streak:9 } }));
+  localStorage.setItem('fx-passport', JSON.stringify({ alex:['FR','JP','BR'] })); localStorage.setItem('fx-perfect', JSON.stringify({ alex:[{ t, score:1250, table:'world', clock:false }] }));
+  localStorage.setItem('fx-people', JSON.stringify({ alex:{ name:'Alex', avatar:'🦊' } })); localStorage.setItem('fx-mute', 'true'); localStorage.setItem('fx-text', 'true'); });
+await h.reload(); await h.waitForTimeout(300);
+await h.click('[data-act=board]'); await h.click('[data-act=tab][data-v=world]'); eq(await h.locator('.fx-hrow:not(.empty)').count(),1,'the saved score shows');
+eq((await txt(h,'#fx-wipe')).trim(),'Start fresh on this device','start fresh is offered');
+await h.click('#fx-wipe'); assert((await txt(h,'#fx-wipe')).includes('Tap again'),'it asks twice'); eq(await h.locator('.fx-hrow:not(.empty)').count(),1,'one tap clears nothing');
+await h.screenshot({path:'w1-wipe-confirm.png', fullPage:true}); await overflow(h,'wipe confirm');
+await h.click('[data-act=tab][data-v=known]'); eq((await txt(h,'#fx-wipe')).trim(),'Start fresh on this device','looking at another table withdraws the question');
+await h.click('#fx-wipe'); await h.click('#fx-wipe');
+eq(await h.locator('#fx-wipe').count(),0,'nothing left to clear');
+eq(await h.evaluate(()=>['world','known','daily'].map(t=>window.__fx.tableRows(t).length).join()),'0,0,0','every table is empty');
+eq(await h.evaluate(()=>window.__fx.stamps('Alex').length + window.__fx.perfects('Alex').length),0,'passport and gold stamps are gone');
+eq(await h.evaluate(()=>localStorage.getItem('fx-mute') + localStorage.getItem('fx-text')),'truetrue','settings are kept');
+await h.reload(); await h.waitForTimeout(300); await h.fill('#fx-name','Alex'); await h.click('#fx-setup [type=submit]');
+assert((await txt(h)).includes('Passport · 0 of'),'a clean passport after reloading'); eq(await h.evaluate(()=>window.__fx.tableRows('world').length),0,'and clean tables');
+
 await browser.close();
 console.log(errors.length ? errors.join('\n') : 'ALL PARTY CHECKS PASSED');

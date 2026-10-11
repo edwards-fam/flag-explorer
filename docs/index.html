@@ -688,6 +688,14 @@
     }
     return rows.sort(byScore).slice(0, 10);
   }
+  // Starting fresh: everything this device has recorded about play (scores, today's result, personal bests, passports and
+  // gold stamps). Settings stay. Offered only while the device is outside a family, because shared scores cannot be taken back.
+  const RECORDS = ['fx-tables', 'fx-bests', 'fx-perfect', 'fx-passport'];
+  const anyRecords = () => dailyData().rows.length > 0 || RECORDS.some(k => Object.values(store.get(k, {}) || {}).some(v => v && (v.length || v.score)));
+  function wipeRecords() {
+    [...RECORDS, 'fx-people'].forEach(k => store.set(k, {}));
+    ['fx-daily', 'fx-cloud', 'fx-synced', 'fx-pushed', 'fx-live'].forEach(k => store.set(k, null));
+  }
   const bestKey = (table, name) => table + '|' + plain(name);
   const bestFor = (table, name) => store.get('fx-bests', {})[bestKey(table, name)] || { score: 0, streak: 0 };
   // A perfect round: all ten flags and all ten bonus questions in one recorded ten-flag round. The wager plays no part.
@@ -1296,6 +1304,7 @@
       ${fromEnd && S.mode === 'free' && !S.party ? `<button class="fx-go mt-5" data-act="again" data-primary>Play again as ${esc(P.name)}</button>
         <button class="fx-quiet block mx-auto mt-3" data-act="back">Back to results</button>`
         : `<button class="fx-go mt-5" data-act="back" data-primary>${fromEnd ? 'Back to results' : 'Back'}</button>`}
+      ${!family() && !fromEnd && anyRecords() ? `<button class="fx-quiet block mx-auto mt-3" data-act="wipe" id="fx-wipe">${S.confirmWipe ? 'Tap again to erase every score and passport on this device. This cannot be undone.' : 'Start fresh on this device'}</button>` : ''}
     </main>`;
   }
 
@@ -1854,7 +1863,12 @@
     if (act === 'guest-add') { if (O.guests.length < SEATS - 1) O.guests.push({ name: '', avatar: spareAvatar() }); tidyParty(); render(false); const boxes = app.querySelectorAll('.fx-guest'); boxes[boxes.length - 1].focus(); return; }
     if (act === 'guest-del') { O.guests.splice(+el.dataset.i, 1); tidyParty(); return render(false); }
     if (act === 'guest-ava') { O.guests[+el.dataset.i].avatar = spareAvatar(); SFX.tap(); return render(false); }
-    if (act === 'tab') { S.tab = el.dataset.v; return render(false); }
+    if (act === 'tab') { S.tab = el.dataset.v; S.confirmWipe = false; return render(false); }
+    if (act === 'wipe') {
+      if (!S.confirmWipe) { S.confirmWipe = true; return render(false); }
+      wipeRecords(); S.confirmWipe = false; SFX.tap();
+      return render(false);
+    }
     if (act === 'family') { S.back = S.screen; S.screen = 'family'; S.confirmLeave = false; return go(); }
     if (act === 'family-sync') { cloudState.ok = null; cloudSync(); return render(false); }
     if (act === 'family-leave') {
@@ -1865,7 +1879,7 @@
     if (act === 'claim-no') { S.claim = null; S.name = ''; render(false); app.querySelector('#fx-name').focus(); return; }
     if (act === 'rules-back') { S.screen = 'start'; return go(); }
     if (act === 'choose') { const party = !!M; openRules(); if (party) O.mode = 'party'; return go(); }
-    if (act === 'board') { S.back = S.screen; S.screen = 'board'; S.tab = S.back === 'end' || S.back === 'match' ? S.table : S.tab || O.pool; cloudSoon(); return go(); }
+    if (act === 'board') { S.back = S.screen; S.screen = 'board'; S.confirmWipe = false; S.tab = S.back === 'end' || S.back === 'match' ? S.table : S.tab || O.pool; cloudSoon(); return go(); }
     if (act === 'passport') { S.back = S.screen; S.screen = 'passport'; S.pp = 0; turning = false; return go(); }
     if (act === 'pp-next') return turnTo(S.pp + 1);
     if (act === 'pp-prev') return turnTo(S.pp - 1);

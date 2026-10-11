@@ -65,7 +65,7 @@ const bScore = await round(B, 'free', 4); assert(bScore > 0 && bScore < 1680, 'R
 await B.waitForTimeout(400); await B.screenshot({ path: 'c4-end-family-place.png' });
 seen = await boardRows(B, 'world'); eq(seen.rows.length, 2, 'both scores on device B'); assert((await boardHead(B)).includes('your family'), 'table labelled as the family’s'); await sync(A);
 seen = await boardRows(A, 'world'); eq(seen.rows.length, 2, 'both scores on device A'); assert(seen.rows[0].includes('Alex') && seen.rows[1].includes('Robin'), 'in order'); eq(seen.rows.filter(r => r.includes('Alex')).length, 1, 'own score not listed twice');
-await A.click('[data-act=board]'); await A.screenshot({ path: 'c5-board-family.png', fullPage: true }); assert((await txt(A, '#fx-cloud-note')).includes('Shared with your family'), 'status line'); await A.click('[data-act=back]');
+await A.click('[data-act=board]'); await A.screenshot({ path: 'c5-board-family.png', fullPage: true }); assert((await txt(A, '#fx-cloud-note')).includes('Shared with your family'), 'status line'); eq(await A.locator('#fx-wipe').count(), 0, 'no start-fresh while sharing with a family'); await A.click('[data-act=back]');
 
 // ---- 4. the same player on a second device: asked first, then the passport follows
 await B.click('[data-act=change-player]'); await enter(B, 'alex');
@@ -107,6 +107,11 @@ await A.click('[data-act=change-player]'); await A.click('[data-act=family]'); a
 eq(await A.evaluate(() => window.__fx.family()), null, 'left'); await A.click('[data-act=back]'); await enter(A, 'Alex');
 seen = await boardRows(A, 'world'); eq(seen.rows.length, 1, 'only this device’s own score after leaving'); await A.click('[data-act=rules-back]'); assert((await boardHead(A)).includes('this device'), 'table labelled as the device’s');
 const sentBefore = mock.state.requests; await sync(A); eq(mock.state.requests, sentBefore, 'nothing sent after leaving');
+// starting fresh after leaving: the device forgets its scores, so joining under a new code begins an empty scoreboard
+await A.click('[data-act=board]'); await A.click('#fx-wipe'); await A.click('#fx-wipe'); eq(await A.locator('.fx-hrow:not(.empty)').count(), 0, 'device cleared after leaving'); await A.click('[data-act=back]');
+await join(A, 'a-new-code-77'); await enter(A, 'Alex'); await sync(A);
+eq(await A.evaluate(() => window.__fx.cloudState.ok), true, 'joined the new family'); eq((await boardRows(A, 'world')).rows.length, 0, 'the new family starts empty'); eq((await boardRows(A, 'daily')).rows.length, 0, 'today included');
+const newFid = await A.evaluate(() => window.__fx.family().fid); eq(docsUnder(newFid + '/tables').length + docsUnder(newFid + '/days').length, 0, 'no old score was sent to it');
 
 // ---- 9. the project's web key: if it is wrong the game carries on without it, and remembers
 mock.state.validKey = 'the-real-key'; mock.state.noKey = 0;
