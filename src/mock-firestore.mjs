@@ -24,11 +24,15 @@ export function startMock() {
   }
   const send = (res, status, body) => { res.writeHead(status, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type', 'access-control-allow-methods': 'GET,POST,PATCH,OPTIONS' }); res.end(JSON.stringify(body)); };
   const fail = (res, status, code) => send(res, status, { error: { code: status, status: code, message: code } });
-  const state = { down: false, requests: 0 };
+  const state = { down: false, requests: 0, withKey: 0, noKey: 0, validKey: null, keyRequired: false };
   const server = http.createServer((req, res) => {
     if (req.method === 'OPTIONS') return send(res, 204, {});
     state.requests++;
     if (state.down) return req.destroy();
+    const key = new URL(req.url, 'http://x').searchParams.get('key');
+    if (key !== null) state.withKey++; else state.noKey++;
+    if (key !== null && state.validKey && key !== state.validKey) return send(res, 400, { error: { code: 400, message: 'API key not valid. Please pass a valid API key.', status: 'INVALID_ARGUMENT', details: [{ reason: 'API_KEY_INVALID' }] } });
+    if (key === null && state.keyRequired) return send(res, 403, { error: { code: 403, message: "Method doesn't allow unregistered callers (callers without established identity). Please use API Key or other form of API consumer identity to call this API.", status: 'PERMISSION_DENIED' } });
     const url = new URL(req.url, 'http://x'), m = decodeURIComponent(url.pathname).match(/^\/v1\/projects\/([^/]+)\/databases\/\(default\)\/documents(?:\/(.*?))?(:commit)?$/);
     if (!m) return fail(res, 404, 'NOT_FOUND');
     const base = `projects/${m[1]}/databases/(default)/documents`, path = m[2] || '';

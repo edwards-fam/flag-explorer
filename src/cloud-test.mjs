@@ -108,5 +108,13 @@ eq(await A.evaluate(() => window.__fx.family()), null, 'left'); await A.click('[
 seen = await boardRows(A, 'world'); eq(seen.rows.length, 1, 'only this device’s own score after leaving'); await A.click('[data-act=rules-back]'); assert((await boardHead(A)).includes('this device'), 'table labelled as the device’s');
 const sentBefore = mock.state.requests; await sync(A); eq(mock.state.requests, sentBefore, 'nothing sent after leaving');
 
+// ---- 9. the project's web key: if it is wrong the game carries on without it, and remembers
+mock.state.validKey = 'the-real-key'; mock.state.noKey = 0;
+const D = await device('D'); await join(D, 'flags1031'); await enter(D, 'Morgan');
+eq(await D.evaluate(() => window.__fx.cloudState.ok), true, 'a rejected key does not stop the scoreboard'); assert(mock.state.noKey > 0, 'requests were repeated without the key');
+eq(await D.evaluate(() => localStorage.getItem('fx-cloud-key')), '"no"', 'and the device remembers not to send it'); eq((await boardRows(D, 'world')).rows.length, 3, 'the family scores arrive');
+const keyed = mock.state.withKey; await sync(D); eq(mock.state.withKey, keyed, 'no further requests with the rejected key');
+mock.state.validKey = null;
+
 await browser.close(); mock.close();
 console.log(errors.length ? errors.join('\n') : 'FAMILY SCOREBOARD CHECKS PASSED');

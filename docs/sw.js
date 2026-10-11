@@ -1,6 +1,6 @@
 // Flag Explorer service worker: keeps the game on the device so it opens instantly and works offline.
 // VERSION changes whenever the game or anything stored with it changes; a new version replaces the old copy.
-const VERSION = '1aa7ed8181e3';
+const VERSION = 'c27a49468e80';
 const CACHE = 'flag-explorer-' + VERSION;
 const PRECACHE = ["./","manifest.webmanifest","icons/apple-touch-icon.png","icons/favicon.svg","icons/icon-192.png","icons/icon-512.png","icons/icon-maskable-512.png","fonts/barlow-condensed-latin-500-normal.woff2","fonts/barlow-condensed-latin-600-normal.woff2","fonts/barlow-condensed-latin-700-normal.woff2","fonts/figtree-latin-400-normal.woff2","fonts/figtree-latin-500-normal.woff2","fonts/figtree-latin-600-normal.woff2","fonts/figtree-latin-700-normal.woff2","fonts/ibm-plex-mono-latin-500-normal.woff2","fonts/ibm-plex-mono-latin-600-normal.woff2"];
 

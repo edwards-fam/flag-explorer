@@ -687,13 +687,21 @@
   const fsRead = v => !v ? null : 'stringValue' in v ? v.stringValue : 'integerValue' in v ? Number(v.integerValue) : 'booleanValue' in v ? v.booleanValue : 'doubleValue' in v ? v.doubleValue : 'arrayValue' in v ? (v.arrayValue.values || []).map(fsRead) : null;
   const fsDoc = d => Object.fromEntries(Object.entries((d && d.fields) || {}).map(([k, v]) => [k, fsRead(v)]));
   const fsRoot = () => `projects/${CLOUD.projectId}/databases/(default)/documents`;
-  async function fsCall(method, path, body) {
+  // Requests carry the project's public web key when there is one. If Google rejects the key, the request is repeated
+  // without it (the access rules are what decide), and the reverse if it insists on one; the device remembers which worked.
+  let useKey = !!(CLOUD && CLOUD.apiKey) && store.get('fx-cloud-key', 'yes') !== 'no';
+  async function fsCall(method, path, body, again) {
     const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 9000);
+    let out;
     try {
-      const res = await fetch(`${CLOUD.base || 'https://firestore.googleapis.com/v1'}/${path}${path.includes('?') ? '&' : '?'}key=${encodeURIComponent(CLOUD.apiKey || '')}`,
+      const res = await fetch(`${CLOUD.base || 'https://firestore.googleapis.com/v1'}/${path}${useKey ? (path.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(CLOUD.apiKey) : ''}`,
         { method, signal: ctl.signal, headers: body ? { 'content-type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined });
-      return { status: res.status, data: await res.json().catch(() => null) };
+      out = { status: res.status, data: await res.json().catch(() => null) };
     } finally { clearTimeout(timer); }
+    const said = JSON.stringify((out.data && out.data.error) || '');
+    const flip = useKey ? out.status === 400 && /API[_ ]key/i.test(said) : out.status === 403 && /unregistered callers|API key/i.test(said) && !!CLOUD.apiKey;
+    if (flip && !again) { useKey = !useKey; store.set('fx-cloud-key', useKey ? 'yes' : 'no'); return fsCall(method, path, body, true); }
+    return out;
   }
   async function fsGet(path) {
     const r = await fsCall('GET', `${fsRoot()}/${path}`);
