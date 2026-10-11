@@ -1,0 +1,62 @@
+rules_version = '2';
+
+// Flag Explorer: access rules for the family scoreboard.
+//
+// There are no accounts. A family's data lives under an id that is a fingerprint of the family code,
+// so a device can only reach a family whose code it has been given. Nothing can list which families exist,
+// nothing can be deleted, and scores cannot be changed once written.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /families/{fid} {
+      // The family document itself is never used. Denying it also stops anyone listing families.
+      allow read, write: if false;
+
+      function goodFamily() {
+        return fid.matches('^[0-9a-f]{32}$');
+      }
+      function goodName(d) {
+        return d.name is string && d.name.size() > 0 && d.name.size() <= 14
+          && d.avatar is string && d.avatar.size() <= 16;
+      }
+      function goodScore(d) {
+        return d.keys().hasOnly(['name', 'avatar', 'score', 'streak', 'clock', 'perfect', 't'])
+          && d.keys().hasAll(['name', 'avatar', 'score', 'streak', 'clock', 'perfect', 't'])
+          && goodName(d)
+          && d.score is int && d.score >= 0 && d.score <= 2300
+          && d.streak is int && d.streak >= 0 && d.streak <= 10
+          && d.clock is bool && d.perfect is bool
+          && d.t is int && d.t > 0;
+      }
+      function goodPlayer(d) {
+        return d.keys().hasOnly(['name', 'avatar', 'stamps', 'perfect', 'updated',
+                                 'best_world', 'best_known', 'best_daily',
+                                 'streak_world', 'streak_known', 'streak_daily'])
+          && goodName(d)
+          && (!('stamps' in d) || (d.stamps is list && d.stamps.size() <= 250))
+          && (!('perfect' in d) || (d.perfect is list && d.perfect.size() <= 3000));
+      }
+
+      // One document per player: passport stamps, gold stamps and personal bests.
+      match /players/{pid} {
+        allow get, list: if goodFamily();
+        allow create, update: if goodFamily() && goodPlayer(request.resource.data);
+        allow delete: if false;
+      }
+
+      // High scores: one document per finished round, in the Whole world or Well-known table.
+      match /tables/{table}/entries/{entry} {
+        allow get, list: if goodFamily() && table in ['world', 'known'];
+        allow create: if goodFamily() && table in ['world', 'known'] && goodScore(request.resource.data);
+        allow update, delete: if false;
+      }
+
+      // Today's challenge: one document per player per day. The first one written stands.
+      match /days/{day}/entries/{pid} {
+        allow get, list: if goodFamily() && day.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+        allow create: if goodFamily() && day.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') && goodScore(request.resource.data);
+        allow update, delete: if false;
+      }
+    }
+  }
+}

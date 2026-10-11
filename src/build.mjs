@@ -61,11 +61,15 @@ fs.mkdirSync(path.join(site, 'fonts'), { recursive: true });
 fs.mkdirSync(path.join(site, 'icons'), { recursive: true });
 const css = fontCss((pkg, file) => `fonts/${file}`);
 for (const [pkg, file] of fontFiles) fs.copyFileSync(`node_modules/@fontsource/${pkg}/files/${file}`, path.join(site, 'fonts', file));
-for (const f of fs.readdirSync('site')) if (f !== 'sw.js' && f !== 'shell.html') fs.cpSync(path.join('site', f), path.join(site, f), { recursive: true });
+for (const f of fs.readdirSync('site')) if (!['sw.js', 'shell.html', 'cloud.json', 'firestore.rules'].includes(f)) fs.cpSync(path.join('site', f), path.join(site, f), { recursive: true });
 fs.writeFileSync(path.join(site, '.nojekyll'), '');
 
 const shell = fs.readFileSync('site/shell.html', 'utf8');
-const html = shell.replace('/*__RESET__*/', () => reset).replace('/*__FONTS__*/', () => css).replace('/*__TAILWIND__*/', () => tailwind).replace('<!--__GAME__-->', () => stripDebug(body));
+// The family scoreboard is switched on by site/cloud.json: { "projectId": "...", "apiKey": "..." } from the Firebase project.
+// These identify the project and are meant to be public; what protects the data is site/firestore.rules.
+const cloud = fs.existsSync('site/cloud.json') ? JSON.parse(fs.readFileSync('site/cloud.json', 'utf8')) : null;
+const cloudTag = cloud && cloud.projectId ? `<script>window.FX_CLOUD = ${JSON.stringify({ projectId: cloud.projectId, apiKey: cloud.apiKey || '' })};</script>` : '';
+const html = shell.replace('<!--__CLOUD__-->', () => cloudTag).replace('/*__RESET__*/', () => reset).replace('/*__FONTS__*/', () => css).replace('/*__TAILWIND__*/', () => tailwind).replace('<!--__GAME__-->', () => stripDebug(body));
 fs.writeFileSync(path.join(site, 'index.html'), html);
 
 // The service worker's name changes whenever anything it stores changes, which is how installed copies learn there is an update.
@@ -75,4 +79,4 @@ for (const f of precache) hash.update(fs.readFileSync(path.join(site, f === './'
 const version = hash.digest('hex').slice(0, 12);
 fs.writeFileSync(path.join(site, 'sw.js'), fs.readFileSync('site/sw.js', 'utf8').replace('__VERSION__', version).replace('__PRECACHE__', JSON.stringify(precache)));
 fs.writeFileSync(path.join(site, 'version.txt'), version + '\n');
-console.log('site →', site, '| index.html', (html.length / 1024).toFixed(0) + ' KB', '| version', version, '| stored for offline use:', precache.length, 'files');
+console.log('site →', site, '| family scoreboard', cloudTag ? 'on (' + cloud.projectId + ')' : 'off', '| index.html', (html.length / 1024).toFixed(0) + ' KB', '| version', version, '| stored for offline use:', precache.length, 'files');

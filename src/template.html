@@ -640,8 +640,15 @@
   function dailyData() { const d = store.get('fx-daily', null); return d && d.date === todayKey() && Array.isArray(d.rows) ? d : { date: todayKey(), rows: [] }; }
   const playedToday = name => dailyData().rows.find(r => plain(r.name) === plain(name)) || null;
   function tableRows(table) {
-    const rows = table === 'daily' ? dailyData().rows : (store.get('fx-tables', {})[table] || []);
-    return rows.filter(r => r && r.name && (table === 'daily' || r.score > 0)).sort(byScore).slice(0, 10);
+    const local = table === 'daily' ? dailyData().rows : (store.get('fx-tables', {})[table] || []);
+    const f = family(), cache = f && store.get('fx-cloud', null), shared = cache && cache.fid === f.fid && table !== 'daily' ? cache[table] || [] : [];
+    const seen = new Set(), rows = [];
+    for (const r of [...local, ...shared]) {         // the family's rows include this device's own once they have been sent, so each is counted once
+      if (!r || !r.name || (table !== 'daily' && !(r.score > 0))) continue;
+      const k = rowKey(r); if (seen.has(k)) continue;
+      seen.add(k); rows.push(r);
+    }
+    return rows.sort(byScore).slice(0, 10);
   }
   const bestKey = (table, name) => table + '|' + plain(name);
   const bestFor = (table, name) => store.get('fx-bests', {})[bestKey(table, name)] || { score: 0, streak: 0 };
@@ -660,6 +667,145 @@
     return true;
   }
 
+  /* ---------- The family scoreboard (hosted version only) ----------
+     Devices that have entered the same family code share the high scores, today's challenge and each player's passport.
+     Everything is still recorded on the device first. This copies it up and brings the family's copy down, so the game
+     plays the same with no connection and catches up when it is next online. The store is Google Firestore, reached
+     with plain web requests; which family a device belongs to is a fingerprint of the code, never the code itself. */
+  const CLOUD = window.FX_CLOUD && window.FX_CLOUD.projectId && window.fetch && window.crypto && crypto.subtle && window.TextEncoder ? window.FX_CLOUD : null;
+  const family = () => (CLOUD && store.get('fx-family', null)) || null;                 // { code, fid } once this device has joined
+  const cleanCode = v => String(v).trim().toLowerCase().replace(/\s+/g, ' ').slice(0, 40);
+  const pidOf = name => plain(cleanName(name)).replace(/[^\p{L}\p{N}]+/gu, '_').replace(/^_+|_+$/g, '') || 'player';
+  const rowKey = r => pidOf(r.name) + '|' + r.t;
+  async function familyId(code) {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('flag-explorer/family/' + code));
+    return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+  }
+  // Firestore's wire format: every value carries its type.
+  const fsVal = v => typeof v === 'string' ? { stringValue: v } : typeof v === 'boolean' ? { booleanValue: v } : Number.isInteger(v) ? { integerValue: String(v) } : Array.isArray(v) ? { arrayValue: { values: v.map(fsVal) } } : { nullValue: null };
+  const fsFields = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, fsVal(v)]));
+  const fsRead = v => !v ? null : 'stringValue' in v ? v.stringValue : 'integerValue' in v ? Number(v.integerValue) : 'booleanValue' in v ? v.booleanValue : 'doubleValue' in v ? v.doubleValue : 'arrayValue' in v ? (v.arrayValue.values || []).map(fsRead) : null;
+  const fsDoc = d => Object.fromEntries(Object.entries((d && d.fields) || {}).map(([k, v]) => [k, fsRead(v)]));
+  const fsRoot = () => `projects/${CLOUD.projectId}/databases/(default)/documents`;
+  async function fsCall(method, path, body) {
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 9000);
+    try {
+      const res = await fetch(`${CLOUD.base || 'https://firestore.googleapis.com/v1'}/${path}${path.includes('?') ? '&' : '?'}key=${encodeURIComponent(CLOUD.apiKey || '')}`,
+        { method, signal: ctl.signal, headers: body ? { 'content-type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined });
+      return { status: res.status, data: await res.json().catch(() => null) };
+    } finally { clearTimeout(timer); }
+  }
+  async function fsGet(path) {
+    const r = await fsCall('GET', `${fsRoot()}/${path}`);
+    if (r.status === 404) return null;
+    if (r.status !== 200) throw new Error('read ' + r.status);
+    return r.data || {};
+  }
+  // One write. "Already exists" on a create-only write means an earlier attempt got through, which is as good as done.
+  async function fsCommit(write) {
+    const r = await fsCall('POST', `${fsRoot()}:commit`, { writes: [write] });
+    if (r.status === 200) return 'ok';
+    const why = r.data && r.data.error && r.data.error.status;
+    if (r.status === 409 || why === 'ALREADY_EXISTS' || (write.currentDocument && why === 'FAILED_PRECONDITION')) return 'exists';
+    throw new Error('write ' + r.status);
+  }
+
+  // Who has played on this device: their names as typed, for the family's list of players.
+  function rememberPerson(who) { const all = store.get('fx-people', {}); all[plain(who.name)] = { name: who.name, avatar: who.avatar }; store.set('fx-people', all); }
+  function localPeople() {
+    const all = Object.assign({}, store.get('fx-people', {})), tables = store.get('fx-tables', {});
+    for (const r of [...(tables.world || []), ...(tables.known || []), ...dailyData().rows]) if (r && r.name && !r.cloud && !all[plain(r.name)]) all[plain(r.name)] = { name: r.name, avatar: r.avatar };
+    if (P && !all[plain(P.name)]) all[plain(P.name)] = { name: P.name, avatar: P.avatar };
+    return Object.values(all).filter(w => w && w.name).slice(0, 30);
+  }
+  const kept = (key, f) => { const v = store.get(key, null); return v && v.fid === f.fid ? v : { fid: f.fid }; };
+
+  // Scores go up once each. A table entry is named for its player and moment; today's challenge is one entry per player per day,
+  // so whichever device finishes first holds that player's score for the day.
+  async function pushScores(f) {
+    const sent = kept('fx-synced', f), done = new Set(sent.ids || []), todo = [], tables = store.get('fx-tables', {}), d = dailyData();
+    for (const table of ['world', 'known']) for (const r of tables[table] || []) if (r && r.name && r.t && r.score > 0) todo.push([`${table}/${rowKey(r)}`, `tables/${table}/entries/${pidOf(r.name)}_${r.t}`, r]);
+    for (const r of d.rows) if (r && r.name && r.t && !r.cloud) todo.push([`days/${d.date}/${pidOf(r.name)}`, `days/${d.date}/entries/${pidOf(r.name)}`, r]);
+    for (const [id, path, r] of todo) {
+      if (done.has(id)) continue;
+      await fsCommit({ update: { name: `${fsRoot()}/families/${f.fid}/${path}`, fields: fsFields({ name: r.name, avatar: r.avatar || '', score: r.score, streak: r.streak || 0, clock: !!r.clock, perfect: !!r.perfect, t: r.t }) }, currentDocument: { exists: false } });
+      done.add(id); store.set('fx-synced', { fid: f.fid, ids: [...done].slice(-600) });
+    }
+  }
+  // A player's passport, gold stamps and personal bests. Stamps are added to whatever the family's copy already holds, never replaced.
+  const goldCode = g => [g.t, g.score, g.table, g.clock ? 1 : 0].join('|');
+  async function pushPlayer(f, who) {
+    const pid = pidOf(who.name), mine = stamps(who.name).filter(a => C[a]), gold = perfects(who.name).map(goldCode), bests = ['world', 'known', 'daily'].map(t => [t, bestFor(t, who.name)]);
+    const mark = [who.avatar, mine.length, gold.length, ...bests.map(([, b]) => b.score + '/' + b.streak)].join(':'), sent = kept('fx-pushed', f), was = sent.players || {};
+    if (was[pid] === mark) return;
+    const changes = [];
+    if (mine.length) changes.push({ fieldPath: 'stamps', appendMissingElements: { values: mine.map(fsVal) } });
+    if (gold.length) changes.push({ fieldPath: 'perfect', appendMissingElements: { values: gold.map(fsVal) } });
+    for (const [t, b] of bests) { if (b.score > 0) changes.push({ fieldPath: 'best_' + t, maximum: fsVal(b.score) }); if (b.streak > 0) changes.push({ fieldPath: 'streak_' + t, maximum: fsVal(b.streak) }); }
+    changes.push({ fieldPath: 'updated', setToServerValue: 'REQUEST_TIME' });
+    await fsCommit({ update: { name: `${fsRoot()}/families/${f.fid}/players/${pid}`, fields: fsFields({ name: who.name, avatar: who.avatar || '' }) }, updateMask: { fieldPaths: ['name', 'avatar'] }, updateTransforms: changes });
+    was[pid] = mark; store.set('fx-pushed', { fid: f.fid, players: was });
+  }
+  async function pullPlayer(f, who) {
+    const doc = await fsGet(`families/${f.fid}/players/${encodeURIComponent(pidOf(who.name))}`);
+    if (!doc) return;
+    const d = fsDoc(doc), key = plain(who.name);
+    const all = store.get('fx-passport', {}), have = all[key] || [], extra = (d.stamps || []).filter(a => C[a] && !have.includes(a));
+    if (extra.length) { all[key] = [...have, ...extra]; store.set('fx-passport', all); }
+    const golds = store.get('fx-perfect', {}), mine = golds[key] || [], seen = new Set(mine.map(g => g.t));
+    const more = (d.perfect || []).map(code => { const [t, score, table, clock] = String(code).split('|'); return { t: +t, score: +score, table, clock: clock === '1' }; }).filter(g => g.t && !seen.has(g.t));
+    if (more.length) { golds[key] = [...mine, ...more].sort((a, b) => a.t - b.t); store.set('fx-perfect', golds); }
+    const bests = store.get('fx-bests', {}); let better = false;
+    for (const t of ['world', 'known', 'daily']) {
+      const k = bestKey(t, who.name), prev = bests[k] || { score: 0, streak: 0 }, next = { score: Math.max(prev.score, d['best_' + t] || 0), streak: Math.max(prev.streak, d['streak_' + t] || 0) };
+      if (next.score !== prev.score || next.streak !== prev.streak) { bests[k] = next; better = true; }
+    }
+    if (better) store.set('fx-bests', bests);
+  }
+  const okRow = r => r && typeof r.name === 'string' && r.name && Number.isFinite(r.score) && Number.isFinite(r.t);
+  async function pullTables(f) {
+    const cache = { fid: f.fid, at: Date.now() };
+    for (const table of ['world', 'known']) {
+      const res = await fsGet(`families/${f.fid}/tables/${table}/entries?pageSize=10&orderBy=${encodeURIComponent('score desc')}`);
+      cache[table] = ((res && res.documents) || []).map(fsDoc).filter(okRow);
+    }
+    const day = todayKey(), res = await fsGet(`families/${f.fid}/days/${day}/entries?pageSize=60`);
+    const theirs = ((res && res.documents) || []).map(fsDoc).filter(okRow).map(r => Object.assign(r, { cloud: true }));
+    // Today's challenge: the family's copy of a player's score is the one that counts, wherever it was played.
+    const d = dailyData();
+    if (d.date === day) { d.rows = [...d.rows.filter(r => !theirs.some(c => pidOf(c.name) === pidOf(r.name))), ...theirs].sort(byScore); store.set('fx-daily', d); }
+    store.set('fx-cloud', cache);
+  }
+  const cloudState = { busy: false, again: false, ok: null, at: 0 };
+  async function cloudSync() {
+    const f = family();
+    if (!f) return;
+    if (cloudState.busy) { cloudState.again = true; return; }
+    cloudState.busy = true;
+    try {
+      const people = localPeople();
+      await pushScores(f);
+      for (const who of people) await pushPlayer(f, who);
+      for (const who of people) await pullPlayer(f, who);
+      await pullTables(f);
+      cloudState.ok = true;
+    } catch (e) { cloudState.ok = false; }
+    cloudState.busy = false; cloudState.at = Date.now();
+    if (cloudState.again) { cloudState.again = false; return cloudSync(); }
+    const typing = document.activeElement && document.activeElement.tagName === 'INPUT';
+    if (S.screen === 'board' || S.screen === 'family' || (S.screen === 'rules' && !typing)) render(false);            // screens that show the family's data, unless something is being typed
+    const note = app.querySelector('#fx-cloud-note'); if (note) note.textContent = cloudNote();
+  }
+  const cloudSoon = () => { if (family() && !cloudState.busy && Date.now() - cloudState.at > 20000) cloudSync(); };
+  function cloudNote() {
+    if (!family()) return '';
+    if (cloudState.busy && cloudState.ok === null) return 'Fetching your family\'s scores…';
+    if (cloudState.ok === false) return 'Could not reach the family scoreboard just now. Scores are saved on this device and will be sent later.';
+    return 'Shared with your family.';
+  }
+  addEventListener('online', () => cloudSync());
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) cloudSoon(); });
+
   function startScreen(fresh) {
     const hand = dealHand(), last = fresh ? null : P || store.get('fx-player', null);
     S = { screen: 'start', hand, name: last ? last.name : '', avatar: last ? last.avatar : hand[0][0] };
@@ -668,6 +814,7 @@
   function choosePlayer(name, avatar) {
     P = { name, avatar };
     store.set('fx-player', P);
+    rememberPerson(P);
   }
   // Screen 2 opens on today's challenge until this player has played it.
   function openRules() {
@@ -769,6 +916,7 @@
     O.guests = O.guests.map(g => ({ name: cleanName(g.name), avatar: g.avatar })); tidyParty();
     store.set('fx-party', { each: O.each, guests: O.guests });
     const people = [P, ...O.guests], hands = dealMatch(people.length, O.each);
+    people.forEach(rememberPerson);
     const seats = people.map((who, k) => ({ P: { name: who.name, avatar: who.avatar }, S: roundState(buildRound(hands[k]), who.name, { party: true, record: O.each === ROUND }) }));
     M = { seats, turn: 0, first: first % seats.length, each: O.each, over: false };
     takeSeat(M.first);
@@ -782,7 +930,7 @@
   }
   function endMatch() {
     for (const seat of M.seats) { S = seat.S; P = seat.P; closeRound(); S.q = null; S.done = true; S.screen = 'match'; }
-    M.over = true; M.turn = 0; S = M.seats[0].S; P = M.seats[0].P;
+    M.over = true; M.turn = 0; S = M.seats[0].S; P = M.seats[0].P; cloudSync();
     if (M.seats.some(seat => seat.S.perfect)) { SFX.perfect(); confetti(true); }
     else if (Math.max(...M.seats.map(seat => seat.S.score)) > 0) { SFX.fanfare(); confetti(); } else SFX.finish();
   }
@@ -866,12 +1014,12 @@
       } else if (S.score > 0) {
         const tables = store.get('fx-tables', {}); list = tables[S.table] = [...(tables[S.table] || []), row].sort(byScore).slice(0, 10); store.set('fx-tables', tables);
       }
-      const at = list ? list.findIndex(r => r.t === t) : -1;
+      const at = list ? tableRows(S.table).findIndex(r => r.t === t && plain(r.name) === plain(P.name)) : -1;      // the place counts the family's scores too
       if (at >= 0 && at < 10 && S.score > 0) { S.place = at + 1; S.entryT = t; }
     }
   }
   function finish() {
-    closeRound();
+    closeRound(); cloudSync();
     S.screen = 'end'; S.q = null;
     const t = totals(S.log);
     // Celebration waits for the results screen, after the last answer of the round (bonus question included).
@@ -965,9 +1113,40 @@
           <button type="button" class="fx-quiet" style="padding:0" data-act="shuffle">Shuffle avatars</button>
         </div>
         <div class="grid grid-cols-4 gap-3 justify-items-center mt-3" id="fx-hand" role="group" aria-labelledby="fx-hand-label">${viewHand()}</div>
-        <button type="submit" class="fx-go mt-6">Continue</button>
+        ${S.claim ? `<div class="fx-tip" style="margin-top:1.25rem" id="fx-claim">
+            <p><b>${esc(S.claim.name)}</b> already plays in your family${S.claim.stamps ? ` (${plural(S.claim.stamps, 'flag')} stamped)` : ''}. Is that you? Saying yes brings that passport and those scores to this device.</p>
+            <button type="submit" class="fx-go mt-3">Yes, continue as ${esc(S.claim.name)}</button>
+            <button type="button" class="fx-quiet block mx-auto mt-2" data-act="claim-no">No, I will use another name</button>
+          </div>`
+          : `<button type="submit" class="fx-go mt-6" id="fx-continue">Continue</button>`}
       </form>
-      <div class="flex flex-wrap justify-center gap-x-7 mt-3"><button type="button" class="fx-quiet" data-act="board">High scores</button>${textBtn()}</div>
+      ${CLOUD && !family() ? `<p class="fx-tip" style="margin-top:1rem" id="fx-family-tip"><b>Playing with family?</b> <button type="button" class="underline font-semibold" data-act="family">Enter your family code</button> to share one scoreboard.</p>` : ''}
+      <div class="flex flex-wrap justify-center gap-x-7 mt-3"><button type="button" class="fx-quiet" data-act="board">High scores</button>${family() ? `<button type="button" class="fx-quiet" data-act="family">Family scoreboard on</button>` : ''}${textBtn()}</div>
+    </main>`;
+  }
+
+  // Joining, checking or leaving the family scoreboard
+  function viewFamily() {
+    const f = family();
+    return `<main class="fx-sheet mx-auto max-w-xl">
+      <div class="fx-band flex items-center gap-4">
+        ${COMPASS(52)}
+        <div class="min-w-0"><h1 class="fx-h text-4xl">Family scoreboard</h1><p class="fx-label mt-1.5">${f ? 'This device has joined' : 'One scoreboard for everyone'}</p></div>
+      </div>
+      ${f ? `<p>This device shares its scores with everyone who has entered the same family code.</p>
+        <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 mt-4"><dt class="fx-label self-center">Family code</dt><dd class="font-semibold" id="fx-code-shown" style="overflow-wrap:anywhere">${esc(f.code)}</dd></dl>
+        <p class="text-sm text-ink-soft mt-3" id="fx-cloud-note" role="status">${cloudNote()}</p>
+        <button class="fx-go mt-5" data-act="family-sync" data-primary>Update now</button>
+        <button class="fx-quiet block mx-auto mt-3" data-act="family-leave">${S.confirmLeave ? 'Tap again to leave. Scores stay on this device.' : 'Leave this family'}</button>`
+      : `<p>Enter your family's code and this device joins one shared scoreboard: the high scores, today's challenge, and your passport on every device you play on.</p>
+        <p class="text-sm text-ink-soft mt-2">You do this once on each device. Everyone who should share the scoreboard types the same code.</p>
+        <form id="fx-join" novalidate class="mt-4">
+          <label class="fx-label block" for="fx-code">Family code</label>
+          <input class="fx-input mt-1" id="fx-code" type="text" maxlength="40" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="The code your family uses" value="${esc(S.code || '')}">
+          <p class="text-sm text-madder mt-1 min-h-[1.25rem]" id="fx-code-err" role="alert"></p>
+          <button type="submit" class="fx-go mt-2" id="fx-join-btn">Join</button>
+        </form>`}
+      <button class="fx-quiet block mx-auto mt-3" data-act="back">Back</button>
     </main>`;
   }
 
@@ -1059,13 +1238,14 @@
         ${COMPASS(52)}
         <div class="min-w-0">
           <h1 class="fx-h text-4xl">High scores</h1>
-          <p class="fx-label mt-1.5">${sub} · this device</p>
+          <p class="fx-label mt-1.5">${sub} · ${family() ? 'your family' : 'this device'}</p>
         </div>
       </div>
       <div class="grid grid-cols-3 gap-2" role="group" aria-label="Which table">${tabBtn('world', 'Whole world')}${tabBtn('known', 'Well-known')}${tabBtn('daily', 'Today')}</div>
       <div class="fx-hhead fx-label mt-5" aria-hidden="true"><span>Rank</span><span style="width:2.1rem"></span><span>Explorer</span><span>Score</span></div>
       <ol>${rows}</ol>
       <p class="font-script text-lg text-center mt-4">${foot}</p>
+      ${family() ? `<p class="text-sm text-ink-soft text-center mt-2" id="fx-cloud-note" role="status">${cloudNote()}</p>` : ''}
       <p class="text-sm text-ink-soft text-center mt-2" id="fx-star-key">${STAR} marks a perfect round: all ${ROUND} flags and all ${ROUND} bonus questions.</p>
       ${fromEnd && S.mode === 'free' && !S.party ? `<button class="fx-go mt-5" data-act="again" data-primary>Play again as ${esc(P.name)}</button>
         <button class="fx-quiet block mx-auto mt-3" data-act="back">Back to results</button>`
@@ -1517,7 +1697,7 @@
   function render(focus) {
     if (S.screen !== 'play') {
       clockStop();
-      app.innerHTML = ({ start: viewStart, rules: viewRules, board: viewBoard, passport: viewPassport, end: viewEnd, pass: viewPass, match: viewMatch })[S.screen]();
+      app.innerHTML = ({ start: viewStart, rules: viewRules, board: viewBoard, passport: viewPassport, end: viewEnd, pass: viewPass, match: viewMatch, family: viewFamily })[S.screen]();
     } else {
       if (!app.querySelector('#fx-panel')) {
         app.innerHTML = `<div class="lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-7 lg:items-start">
@@ -1560,12 +1740,15 @@
       app.querySelector('#fx-party-err').textContent = '';
       return;
     }
+    if (ev.target.id === 'fx-code') { S.code = ev.target.value; app.querySelector('#fx-code-err').textContent = ''; return; }
     if (ev.target.id !== 'fx-name') return;
+    if (S.claim) { S.claim = null; S.name = ev.target.value; render(false); const box = app.querySelector('#fx-name'); box.focus(); box.setSelectionRange(box.value.length, box.value.length); return; }
     S.name = ev.target.value;
     app.querySelector('#fx-name-err').textContent = '';
   });
-  app.addEventListener('submit', ev => {
+  app.addEventListener('submit', async ev => {
     ev.preventDefault();
+    if (ev.target.id === 'fx-join') return joinFamily();
     if (ev.target.id !== 'fx-setup') return;
     const name = cleanName(S.name);
     if (!name) {
@@ -1573,9 +1756,29 @@
       app.querySelector('#fx-name').focus();
       return;
     }
+    // A name that is new to this device may already belong to someone in the family: ask before taking over their passport.
+    const f = family(), known = store.get('fx-people', {})[plain(name)];
+    if (f && !known && !(S.claim && plain(S.claim.name) === plain(name))) {
+      const btn = app.querySelector('#fx-continue');
+      if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
+      let doc = null;
+      try { doc = await fsGet(`families/${f.fid}/players/${encodeURIComponent(pidOf(name))}`); } catch (e) { /* offline: carry on, the device catches up later */ }
+      if (S.screen !== 'start') return;
+      if (doc) { const d = fsDoc(doc); S.name = name; S.claim = { name: d.name || name, stamps: (d.stamps || []).length }; return render(false); }
+    }
     choosePlayer(name, S.avatar);
-    S.name = name; openRules(); go();
+    S.name = name; S.claim = null; openRules(); go(); cloudSync();
   });
+  async function joinFamily() {
+    const input = app.querySelector('#fx-code'), err = app.querySelector('#fx-code-err'), btn = app.querySelector('#fx-join-btn'), code = cleanCode(input.value);
+    S.code = input.value;
+    if (code.length < 4) { err.textContent = 'A family code has at least 4 characters.'; return input.focus(); }
+    btn.disabled = true; btn.textContent = 'Joining…';
+    const fid = await familyId(code);
+    store.set('fx-family', { code, fid }); store.set('fx-cloud', null); cloudState.ok = null; S.code = '';
+    await cloudSync();
+    if (S.screen === 'family') render(false);
+  }
 
   function copyResult(btn) {
     const text = shareText();
@@ -1606,9 +1809,17 @@
     if (act === 'guest-del') { O.guests.splice(+el.dataset.i, 1); tidyParty(); return render(false); }
     if (act === 'guest-ava') { O.guests[+el.dataset.i].avatar = spareAvatar(); SFX.tap(); return render(false); }
     if (act === 'tab') { S.tab = el.dataset.v; return render(false); }
+    if (act === 'family') { S.back = S.screen; S.screen = 'family'; S.confirmLeave = false; return go(); }
+    if (act === 'family-sync') { cloudState.ok = null; cloudSync(); return render(false); }
+    if (act === 'family-leave') {
+      if (!S.confirmLeave) { S.confirmLeave = true; return render(false); }
+      ['fx-family', 'fx-cloud', 'fx-synced', 'fx-pushed'].forEach(k => store.set(k, null)); S.confirmLeave = false; cloudState.ok = null;
+      return render(false);
+    }
+    if (act === 'claim-no') { S.claim = null; S.name = ''; render(false); app.querySelector('#fx-name').focus(); return; }
     if (act === 'rules-back') { S.screen = 'start'; return go(); }
     if (act === 'choose') { const party = !!M; openRules(); if (party) O.mode = 'party'; return go(); }
-    if (act === 'board') { S.back = S.screen; S.screen = 'board'; S.tab = S.back === 'end' || S.back === 'match' ? S.table : S.tab || O.pool; return go(); }
+    if (act === 'board') { S.back = S.screen; S.screen = 'board'; S.tab = S.back === 'end' || S.back === 'match' ? S.table : S.tab || O.pool; cloudSoon(); return go(); }
     if (act === 'passport') { S.back = S.screen; S.screen = 'passport'; S.pp = 0; turning = false; return go(); }
     if (act === 'pp-next') return turnTo(S.pp + 1);
     if (act === 'pp-prev') return turnTo(S.pp - 1);
@@ -1665,6 +1876,7 @@
     return v;
   }
   function boot(saved) {
+    cloudSync();
     const s = saved && saved.S, live = s && Array.isArray(s.round) && s.round.every(r => r && C[r.a2] && r.bonus) && (s.screen === 'play' || s.screen === 'end');
     const m = saved && saved.M, okRound = x => x && Array.isArray(x.round) && x.round.every(r => r && C[r.a2] && r.bonus);
     if (m && Array.isArray(m.seats) && m.seats.length > 1 && m.seats.every(seat => seat && seat.P && okRound(seat.S)) && m.seats[m.turn]) {
@@ -1681,6 +1893,6 @@
   if (hot && hot.snapshot) hot.snapshot(() => ({ S, P, M }));
   if (hot && hot.ready) hot.ready(data => boot(data || liveSaved())); else boot((hot && hot.data) || liveSaved());
 
-  window.__fx = { perfects, deck, markSeen, seenList, get match() { return M; }, standings, fitOpts, get sound() { return { ac, master, keepAlive, IOS }; }, ppPages, flagWorth, streakBonus, speedBonus, totals, entryTotal, get state() { return S; }, get player() { return P; }, get opts() { return O; }, C, POOLS, KNOWN, buildRound, tableRows, stamps, shareText, todayKey, AVATARS };
+  window.__fx = { family, cloudSync, cloudState, pidOf, perfects, deck, markSeen, seenList, get match() { return M; }, standings, fitOpts, get sound() { return { ac, master, keepAlive, IOS }; }, ppPages, flagWorth, streakBonus, speedBonus, totals, entryTotal, get state() { return S; }, get player() { return P; }, get opts() { return O; }, C, POOLS, KNOWN, buildRound, tableRows, stamps, shareText, todayKey, AVATARS };
 })();
 </script>
