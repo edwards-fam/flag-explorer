@@ -821,6 +821,8 @@
     if (all[k]) { all[k].avatar = avatar; store.set('fx-people', all); }
     if (last && plain(last.name) === k) store.set('fx-player', Object.assign(last, { avatar }));
     if (P && plain(P.name) === k) P.avatar = avatar;
+    // the first screen may be holding this player's name with the old picture selected: Continue must not put the old one back
+    if (S && S.hand && typeof S.name === 'string' && plain(cleanName(S.name)) === k) { S.avatar = avatar; cloudState.faced = true; }
   }
   async function syncPlayer(f, who) {
     const pid = pidOf(who.name), key = plain(who.name), where = `families/${f.fid}/players/`;
@@ -917,7 +919,8 @@
     cloudState.busy = false; cloudState.at = Date.now();
     if (cloudState.again) { cloudState.again = false; return cloudSync(); }
     const typing = document.activeElement && document.activeElement.tagName === 'INPUT';
-    if (S.screen === 'board' || S.screen === 'family' || (S.screen === 'rules' && !typing)) render(false);            // screens that show the family's data, unless something is being typed
+    if (S.screen === 'board' || S.screen === 'family' || ((S.screen === 'rules' || (S.screen === 'start' && cloudState.faced)) && !typing)) render(false);            // screens that show the family's data, unless something is being typed
+    cloudState.faced = false;
     const note = app.querySelector('#fx-cloud-note'); if (note) note.textContent = cloudNote();
   }
   const cloudSoon = () => { if (family() && !cloudState.busy && Date.now() - cloudState.at > 20000) cloudSync(); };

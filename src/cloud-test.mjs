@@ -139,6 +139,9 @@ eq(await F.evaluate(() => window.__fx.stamps('Casey').length), 10, 'and the pass
 const G = await device('G'); await enter(G, 'Casey'); const stray = (await who(G)).avatar; await G.click('[data-act=rules-back]');
 await join(G, 'two-devices-1'); await sync(G);
 if (stray !== face) { eq((await who(G)).avatar, face, 'a device the player has not played on takes the family’s picture'); eq(playerDoc(fid2, 'casey').avatar, face, 'and does not overwrite it'); }
+eq((await txt(G, '#fx-me')).trim(), face, 'the first screen shows the family’s picture too');
+await G.click('#fx-setup [type=submit]'); await G.waitForFunction(() => window.__fx.state.screen === 'rules'); await settle(G); await sync(G);
+eq((await who(G)).avatar, face, 'and carrying on from the first screen keeps it'); eq(playerDoc(fid2, 'casey').avatar, face, 'without sending the old picture to the family');
 // a deliberate change of picture on one device follows the player to the others
 await F.click('[data-act=rules-back]'); await F.click('[data-act=shuffle]'); const fresh = await F.evaluate(now => [...document.querySelectorAll('#fx-hand [data-act=avatar]')].map(b => b.dataset.e).find(e => e !== now), face);
 await F.click(`#fx-hand [data-act=avatar][data-e="${fresh}"]`); await F.click('#fx-setup [type=submit]'); await F.waitForFunction(() => window.__fx.state.screen === 'rules'); await settle(F);
