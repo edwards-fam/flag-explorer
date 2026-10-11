@@ -1,0 +1,1676 @@
+<title>Flag Explorer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+  /* Tailwind reads its colours and fonts from the CSS tokens below, so one palette drives everything. */
+  if (window.tailwind) {
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            paper: 'var(--paper)', 'paper-hi': 'var(--paper-hi)', 'paper-lo': 'var(--paper-lo)',
+            ink: 'var(--ink)', 'ink-soft': 'var(--ink-soft)', rule: 'var(--rule)', sea: 'var(--sea)',
+            madder: 'var(--madder)', verdigris: 'var(--verdigris)', ochre: 'var(--ochre)'
+          },
+          fontFamily: {
+            display: 'var(--font-display)', script: 'var(--font-script)',
+            body: 'var(--font-body)', data: 'var(--font-data)'
+          }
+        }
+      }
+    };
+  }
+</script>
+<style>
+  /* Layout: white cards on a cool ground. Each screen opens with a navy band; the flag sits on a boarding pass with a tear line above the answers. */
+  :root {
+    --paper: #EEF2F7;      /* the ground behind the cards */
+    --paper-hi: #FFFFFF;   /* cards */
+    --paper-lo: #F2F5FA;   /* quiet fills: tiles, hint buttons, hover */
+    --ink: #0F1B33;
+    --ink-soft: #47577A;
+    --rule: #C9D3E2;       /* lines and resting outlines */
+    --sea: #E3EBF6;        /* the tint behind each flag, and behind a selected choice */
+    --madder: #B3261E;     /* costs and misses */
+    --verdigris: #14664A;  /* gains and correct answers */
+    --ochre: #8A6512;      /* gold dark enough to read as text */
+    --gold: #C9A24A;       /* gold as a fill or a line */
+    --navy: #14274A;       /* the band across the top, taken from the passport cover */
+    --band-fg: #FFFFFF; --band-gold: #E2BE6A;
+    --line: #14274A;       /* outlines of things you can press */
+    --go-bg: #14274A; --go-fg: #FFFFFF; --go-edge: #C9A24A;      /* the main button */
+    --ok-tint: #E1F2EA; --no-tint: #FBE9E7; --gold-tint: #F6EDD6;
+    --on-accent: #FFFFFF;
+    --card-shadow: 0 6px 18px rgba(20, 39, 74, .12);
+    --flag-edge: rgba(15, 27, 51, .3);
+    --flag-shadow: rgba(15, 27, 51, .22);
+    --focus: #2F5BD0;
+    --font-display: 'Barlow Condensed', 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
+    --font-script: 'Figtree', 'Segoe UI', system-ui, sans-serif;
+    --font-body: 'Figtree', 'Segoe UI', system-ui, sans-serif;
+    --font-data: 'IBM Plex Mono', ui-monospace, Menlo, 'Courier New', monospace;
+    --flag-h: clamp(120px, 22vh, 224px);
+    /* The passport is an object in the hand: a navy booklet with gold lettering, the same in both themes */
+    --pp-navy: #1B2947; --pp-gold: #CFAE66; --pp-page: #F1EEE2; --pp-ink: #26324F; --pp-edge: #B9B39E;
+    --pp-ink-a: #2A4B8D; --pp-ink-b: #9B2D3A; --pp-ink-c: #2B6A4C; --pp-ink-d: #5B3A8C; --pp-ink-gold: #8A6512;
+    --pp-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
+    --pp-hand: 'Snell Roundhand', 'Segoe Script', 'Brush Script MT', cursive;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #0A1322; --paper-hi: #131F36; --paper-lo: #1A2946;
+      --ink: #EEF2F9; --ink-soft: #A6B3CC; --rule: #2E3F60; --sea: #1D2D4D;
+      --madder: #FF9088; --verdigris: #62D9AA; --ochre: #E2BE6A; --gold: #C9A24A; --navy: #1D2F58;
+      --line: #62759F; --go-bg: #E2BE6A; --go-fg: #0A1322; --go-edge: #8A6C22;
+      --ok-tint: #123828; --no-tint: #3F1C1A; --gold-tint: #3A2F12; --on-accent: #0A1322;
+      --card-shadow: 0 6px 18px rgba(0, 0, 0, .35); --flag-edge: rgba(0, 0, 0, .6); --flag-shadow: rgba(0, 0, 0, .45); --focus: #8FB0FF;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #0A1322; --paper-hi: #131F36; --paper-lo: #1A2946;
+    --ink: #EEF2F9; --ink-soft: #A6B3CC; --rule: #2E3F60; --sea: #1D2D4D;
+    --madder: #FF9088; --verdigris: #62D9AA; --ochre: #E2BE6A; --gold: #C9A24A; --navy: #1D2F58;
+    --line: #62759F; --go-bg: #E2BE6A; --go-fg: #0A1322; --go-edge: #8A6C22;
+    --ok-tint: #123828; --no-tint: #3F1C1A; --gold-tint: #3A2F12; --on-accent: #0A1322;
+    --card-shadow: 0 6px 18px rgba(0, 0, 0, .35); --flag-edge: rgba(0, 0, 0, .6); --flag-shadow: rgba(0, 0, 0, .45); --focus: #8FB0FF;
+    color-scheme: dark;
+  }
+
+  body { background: var(--paper); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.5; -webkit-tap-highlight-color: transparent; }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  /* Larger text: everything sized in rem grows by an eighth, and the smallest labels grow a little more */
+  :root[data-text="large"] { font-size: 112.5%; }
+  :root[data-text="large"] .fx-label, :root[data-text="large"] .fx-quiet, :root[data-text="large"] .fx-pill { font-size: .78rem; letter-spacing: .05em; }
+  :root[data-text="large"] .fx-hint.used .fx-label { font-size: .68rem; letter-spacing: .05em; }
+
+  /* Cards. Their padding is held in variables so the navy band and the tear line can run from edge to edge. */
+  .fx-sheet { --px: 1.125rem; --py: 1.125rem; background: var(--paper-hi); border-radius: 18px; box-shadow: var(--card-shadow); padding: var(--py) var(--px); }
+  @media (min-width: 640px) { .fx-sheet { --px: 1.75rem; --py: 1.6rem; } }
+  .fx-band { margin: calc(-1 * var(--py)) calc(-1 * var(--px)) 1rem; padding: .85rem var(--px) 1rem; border-radius: 18px 18px 0 0; background: var(--navy); color: var(--band-fg); }
+  .fx-band .fx-label, .fx-band .fx-quiet, .fx-band .fx-compass { color: var(--band-gold); }
+  .fx-band .fx-num { color: var(--band-fg); font-size: 1.75rem; line-height: 1; }
+  .fx-band .fx-ava { background: var(--band-fg); }
+  .fx-label { font-family: var(--font-data); font-weight: 500; font-size: .69rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); line-height: 1.35; }
+  .fx-num { font-family: var(--font-display); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .01em; color: var(--ink); }
+  .fx-h { font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; line-height: 1.05; text-wrap: balance; }
+  .fx-word { font-family: var(--font-display); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; line-height: 1; white-space: nowrap; font-size: clamp(1.35rem, 6.6vw, 1.85rem); }
+  .fx-rule { border: 0; border-top: 1px solid var(--rule); }
+  .fx-star { font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif; font-size: .9em; }
+  .font-script { font-weight: 600; }
+  .fx-compass { color: var(--ink); }
+  .fx-compass-in { fill: var(--paper-hi); }
+  .fx-band .fx-compass-in { fill: var(--navy); }
+  .fx-seal .fx-compass-in { fill: var(--sea); }
+
+  /* Round progress: ten bars */
+  .fx-progress { display: flex; align-items: center; gap: .75rem; }
+  .fx-scale-bar { flex: 1; display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; }
+  .fx-seg { height: 8px; border-radius: 4px; background: var(--rule); }
+  .fx-seg.ok { background: var(--ink); }
+  .fx-seg.miss { background: var(--madder); }
+  .fx-seg.now { background: var(--gold); }
+
+  /* The boarding pass: the flag on a tinted panel, then a tear line with a notch at each edge */
+  .fx-plate { display: flex; flex-direction: column; gap: .6rem; margin: 1rem 0 0; }
+  .fx-flagbox { position: relative; height: calc(var(--flag-h) + 1.5rem); display: flex; align-items: center; justify-content: center; padding: .75rem; border-radius: 12px; background: var(--sea); }
+  .fx-flag {
+    width: min(100%, calc(var(--flag-h) * var(--ar))); aspect-ratio: var(--ar); height: auto; max-width: 100%;
+    filter: drop-shadow(0 0 .6px var(--flag-edge)) drop-shadow(0 6px 10px var(--flag-shadow));
+    animation: fx-rise .3s ease-out both;
+  }
+  .fx-caption { font-family: var(--font-body); font-weight: 600; font-size: 1.1rem; text-align: center; line-height: 1.25; min-height: 1.35em; text-wrap: balance; }
+  .fx-caption.named { font-family: var(--font-display); font-weight: 700; font-size: 1.9rem; line-height: 1; text-transform: uppercase; letter-spacing: .04em; }
+  .fx-thumb { width: 2.25rem; height: 1.5rem; object-fit: contain; flex: none; filter: drop-shadow(0 0 .6px var(--flag-edge)); }
+  .fx-perf { position: relative; height: 0; margin: 1rem calc(14px - var(--px)) 0; border-top: 2px dashed var(--rule); }
+  .fx-perf::before, .fx-perf::after { content: ''; position: absolute; top: -11px; width: 20px; height: 20px; border-radius: 50%; background: var(--paper); }
+  .fx-perf::before { left: -24px; }
+  .fx-perf::after { right: -24px; }
+  .fx-pill { font-family: var(--font-data); font-weight: 600; font-size: .69rem; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; border-radius: 999px; padding: .3rem .65rem; line-height: 1.3; }
+  .fx-pill.ok { color: var(--verdigris); background: var(--ok-tint); }
+  .fx-pill.no { color: var(--madder); background: var(--no-tint); }
+  .fx-pill.gold { color: var(--ochre); background: var(--gold-tint); }
+  .fx-tip { margin-top: .5rem; padding: .4rem .7rem; border-radius: 12px; background: var(--gold-tint); font-size: .85rem; line-height: 1.3; }
+  .fx-tip b { color: var(--ochre); font-weight: 700; }
+
+  @media (max-width: 350px) { .fx-sheet { --px: .8rem; } .fx-opt { padding: .45rem; gap: .4rem; } }
+  @media (max-height: 740px) {
+    :root { --flag-h: clamp(100px, 19vh, 224px); }
+    .fx-band { padding-block: .6rem .7rem; margin-bottom: .7rem; }
+    .fx-plate { margin-top: .7rem; gap: .45rem; }
+    .fx-flagbox { height: calc(var(--flag-h) + 1rem); padding: .5rem; }
+    .fx-perf { margin-top: .7rem; }
+    .fx-opt { min-height: 3.25rem; }
+    .fx-hint-l { margin-top: .45rem; }
+    .fx-hint { min-height: 2.85rem; }
+  }
+
+  /* Answer buttons */
+  .fx-opt {
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .5rem; text-align: left;
+    min-height: 3.75rem; padding: .5rem .6rem; background: var(--paper-hi); color: var(--ink);
+    border: 1.5px solid var(--line); border-radius: 14px; box-shadow: 0 2px 0 var(--line);
+    font-size: 1rem; font-weight: 600; line-height: 1.15; overflow-wrap: anywhere;
+    transition: transform .08s, box-shadow .08s, background-color .15s;
+  }
+  @media (hover: hover) { .fx-opt:not(:disabled):hover { background: var(--paper-lo); } }
+  .fx-opt:not(:disabled):active { transform: translateY(2px); box-shadow: 0 0 0 var(--line); }
+  .fx-key { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--line); color: var(--paper-hi); font-family: var(--font-data); font-weight: 600; font-size: .75rem; }
+  .fx-opt:disabled { cursor: default; }
+  .fx-opt.dim { color: var(--ink-soft); border-color: var(--rule); background: var(--paper-lo); box-shadow: none; }
+  .fx-opt.out { color: var(--ink-soft); border: 1.5px dashed var(--rule); background: transparent; box-shadow: none; text-decoration: line-through; opacity: .65; }
+  .fx-opt.dim .fx-key, .fx-opt.out .fx-key { background: var(--rule); color: var(--ink-soft); }
+  .fx-opt.right { background: var(--verdigris); border-color: var(--verdigris); color: var(--on-accent); box-shadow: none; }
+  .fx-opt.right .fx-key { background: var(--on-accent); color: var(--verdigris); }
+  .fx-opt.wrong { border-color: var(--madder); color: var(--madder); background: var(--no-tint); box-shadow: none; }
+  .fx-opt.wrong .fx-key { background: var(--madder); color: var(--paper-hi); }
+  .fx-mark { font-family: var(--font-data); font-weight: 600; }
+  .fx-mark:empty { display: none; }
+
+  /* Hint buttons: gold, raised like the answers, under a line that says what they are */
+  .fx-hint-l { display: flex; align-items: center; gap: .35rem; margin-top: .65rem; color: var(--ochre); font-weight: 600; }
+  .fx-hint-l svg { flex: none; }
+  .fx-hint {
+    display: flex; flex-direction: column; justify-content: center; gap: .05rem; text-align: center; min-height: 3.1rem; padding: .3rem;
+    border: 1.5px solid var(--gold); border-radius: 12px; background: var(--gold-tint); color: var(--ink); line-height: 1.2; overflow-wrap: anywhere;
+    box-shadow: 0 2px 0 var(--gold); transition: transform .08s, box-shadow .08s, background-color .15s;
+  }
+  @media (hover: hover) { .fx-hint:not(:disabled):hover { background: var(--paper-hi); } }
+  .fx-hint:not(:disabled):active { transform: translateY(2px); box-shadow: 0 0 0 var(--gold); }
+  .fx-hint:disabled { cursor: default; box-shadow: none; }
+  .fx-hint .fx-label { font-family: var(--font-body); font-weight: 700; font-size: .88rem; letter-spacing: 0; text-transform: none; color: var(--ink); }
+  .fx-hint.used { background: var(--paper-hi); border-style: dashed; }
+  .fx-hint.used .fx-label { font-family: var(--font-data); font-weight: 500; font-size: .62rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+  .fx-hint .fx-cost { font-family: var(--font-data); font-weight: 600; font-size: .76rem; color: var(--madder); }
+  .fx-hint .fx-reveal { font-weight: 700; font-size: .9rem; }
+
+  /* Primary action */
+  .fx-go {
+    display: block; width: 100%; min-height: 3.5rem; padding: .6rem 1rem; background: var(--go-bg); color: var(--go-fg); border: 0; border-radius: 14px;
+    font-family: var(--font-display); font-weight: 600; font-size: 1.35rem; letter-spacing: .06em; text-transform: uppercase; text-align: center;
+    box-shadow: 0 3px 0 var(--go-edge); transition: transform .08s, box-shadow .08s;
+  }
+  .fx-go:active { transform: translateY(3px); box-shadow: 0 0 0 var(--go-edge); }
+  .fx-quiet { font-family: var(--font-data); font-weight: 500; font-size: .69rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); text-decoration: underline; text-underline-offset: 3px; padding: .5rem 0; }
+
+  /* A perfect round is announced as one large gold stamp; the gold star marks it on the tables */
+  .fx-perfect {
+    display: inline-block; padding: .5rem 1rem .55rem; color: var(--ochre); background: var(--gold-tint); border: 3px solid currentColor; border-radius: 14px;
+    box-shadow: inset 0 0 0 3px var(--paper-hi), inset 0 0 0 4.5px currentColor; transform: rotate(-3deg);
+    font-family: var(--font-display); font-weight: 700; font-size: clamp(1.7rem, 8.4vw, 2.5rem); line-height: 1; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap;
+    animation: fx-seal .4s cubic-bezier(.2, 1.4, .4, 1) both;
+  }
+  .fx-perfect svg { display: inline-block; vertical-align: .06em; }
+  .fx-gold-star { display: inline-block; flex: none; vertical-align: -.15em; }
+
+  /* Result stamp */
+  .fx-stamp {
+    display: inline-block; flex: none; font-family: var(--font-data); font-weight: 600; font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; text-align: center; line-height: 1.3;
+    padding: .45rem .75rem; border: 2.5px solid currentColor; border-radius: 10px; box-shadow: inset 0 0 0 3px var(--paper-hi), inset 0 0 0 4px currentColor;
+    transform: rotate(-5deg); animation: fx-stamp .32s cubic-bezier(.2, 1.4, .4, 1) both;
+  }
+  .fx-stamp.ok { color: var(--verdigris); }
+  .fx-stamp.no { color: var(--madder); }
+  .fx-stamp.bonus { color: var(--ochre); }
+
+  /* Player avatars: an emoji in a gold-ringed disc */
+  .fx-ava {
+    display: inline-grid; place-items: center; flex: none; width: var(--s, 3.25rem); height: var(--s, 3.25rem); border-radius: 50%;
+    background: var(--paper-hi); box-shadow: 0 0 0 2px var(--gold);
+    font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif; font-size: calc(var(--s, 3.25rem) * .52); line-height: 1;
+  }
+  button.fx-ava { background: var(--paper-lo); box-shadow: 0 0 0 1.5px var(--rule); transition: transform .1s; }
+  @media (hover: hover) { button.fx-ava:hover { background: var(--sea); } }
+  button.fx-ava[aria-pressed="true"] { background: var(--sea); box-shadow: 0 0 0 3px var(--line); transform: scale(1.07); }
+  .fx-ava.blank { background: transparent; box-shadow: none; border: 1.5px dashed var(--rule); }
+  .fx-input {
+    display: block; width: 100%; min-width: 0; padding: .6rem .8rem; background: var(--paper-hi); color: var(--ink);
+    border: 1.5px solid var(--rule); border-radius: 12px; font-family: var(--font-body); font-size: 1.15rem; font-weight: 600; line-height: 1.3;
+  }
+  .fx-input:focus { border-color: var(--line); }
+  .fx-input::placeholder { color: var(--ink-soft); font-weight: 400; }
+  .fx-clip { overflow: hidden; text-overflow: ellipsis; }
+  /* Pass and play: the line-up on the game-choice screen, and each player's flags folded away on the result */
+  .fx-seat { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .65rem; }
+  .fx-seat .fx-input { padding: .45rem .7rem; font-size: 1.05rem; }
+  .fx-fold + .fx-fold { border-top: 1px solid var(--rule); }
+  .fx-fold summary { display: grid; grid-template-columns: auto minmax(0, 1fr) auto 1rem; align-items: center; gap: .6rem; padding: .55rem 0; cursor: pointer; list-style: none; }
+  .fx-fold summary::-webkit-details-marker { display: none; }
+  .fx-fold summary::after { content: '+'; font-family: var(--font-data); font-weight: 600; color: var(--ink-soft); text-align: center; }
+  .fx-fold[open] summary::after { content: '−'; }
+  .fx-tile { background: var(--paper-lo); border-radius: 12px; padding: .55rem .4rem; }
+
+  /* High scores */
+  .fx-hhead, .fx-hrow { display: grid; grid-template-columns: 2.5rem auto minmax(0, 1fr) auto; align-items: center; column-gap: .65rem; padding: .45rem .5rem; }
+  .fx-hhead { padding-block: 0 .35rem; border-bottom: 1.5px solid var(--ink); }
+  .fx-hrow + .fx-hrow { border-top: 1px solid var(--rule); }
+  .fx-hrank { font-family: var(--font-display); font-weight: 600; font-size: 1.15rem; text-transform: uppercase; color: var(--ink-soft); }
+  .fx-hrow.top .fx-hrank { color: var(--ochre); }
+  .fx-hrow.hot { background: var(--gold-tint); border-radius: 10px; }
+  .fx-hrow.empty { color: var(--ink-soft); }
+
+  /* Game choices on the second screen */
+  .fx-mode {
+    display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: .65rem; row-gap: .1rem; width: 100%; text-align: left; line-height: 1.3;
+    padding: .7rem .8rem; background: var(--paper-hi); color: var(--ink); border: 1.5px solid var(--rule); border-radius: 14px;
+  }
+  .fx-mode::before { content: ''; grid-row: 1 / span 2; width: 1rem; height: 1rem; margin-top: .15rem; border: 1.5px solid var(--line); border-radius: 50%; }
+  .fx-mode > * { grid-column: 2; }
+  .fx-mode b { font-weight: 700; font-size: 1.02rem; }
+  .fx-mode small { font-size: .86rem; color: var(--ink-soft); }
+  .fx-mode[aria-pressed="true"] { background: var(--sea); border-color: var(--line); }
+  .fx-mode[aria-pressed="true"]::before { background: var(--line); box-shadow: inset 0 0 0 3px var(--sea); }
+  .fx-mode[aria-pressed="true"] small { color: var(--ink); opacity: .8; }
+  .fx-pick { min-height: 2.75rem; padding: .5rem .25rem; text-align: center; font-size: clamp(.78rem, 3.5vw, .92rem); font-weight: 600; line-height: 1.2; background: var(--paper-hi); color: var(--ink); border: 1.5px solid var(--rule); border-radius: 12px; }
+  .fx-pick[aria-pressed="true"] { background: var(--go-bg); color: var(--go-fg); border-color: var(--go-bg); }
+
+  /* The clock on timed rounds, and the sealed final flag */
+  .fx-clock { height: 8px; border-radius: 4px; background: var(--rule); overflow: hidden; }
+  .fx-clock i { display: block; height: 100%; border-radius: 4px; background: var(--gold); transform-origin: left center; transition: transform .1s linear; }
+  .fx-clock.low i { background: var(--madder); }
+  .fx-seal { display: none; position: absolute; inset: 0; flex-direction: column; align-items: center; justify-content: center; gap: .5rem; }
+  .fx-plate.sealed .fx-seal { display: flex; }
+  .fx-plate.sealed .fx-flag { visibility: hidden; }
+
+  /* Passport booklet */
+  .pp-stage { overflow: hidden; padding: .75rem .5rem 1.1rem; }
+  .pp-book {
+    position: relative; display: block; width: min(100%, 21rem); aspect-ratio: 88 / 125; margin-inline: auto; perspective: 1500px; cursor: pointer;
+    border-radius: .7rem; background: var(--pp-page);
+    box-shadow: 0 2px 0 var(--pp-edge), 0 4px 0 var(--pp-page), 0 5px 0 var(--pp-edge), 5px 10px 14px rgba(0, 0, 0, .35);
+  }
+  .pp-leaf { position: absolute; inset: 0; border-radius: .7rem; overflow: hidden; transform-origin: left center; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+  .pp-leaf.out { z-index: 2; animation: pp-out .7s cubic-bezier(.45, .05, .55, .95) forwards; }
+  .pp-leaf.in { z-index: 2; animation: pp-in .7s cubic-bezier(.45, .05, .55, .95) forwards; }
+  @keyframes pp-out { to { transform: rotateY(-178deg); } }
+  @keyframes pp-in { from { transform: rotateY(-178deg); } to { transform: rotateY(0deg); } }
+  .pp-cover {
+    display: flex; flex-direction: column; align-items: center; justify-content: space-between; height: 100%; padding: 14% 8% 13%;
+    color: var(--pp-gold); text-align: center; text-shadow: 0 1px 0 rgba(0, 0, 0, .45);
+    background: radial-gradient(120% 90% at 30% 15%, rgba(255, 255, 255, .09), transparent 60%), linear-gradient(90deg, rgba(0, 0, 0, .4) 0, transparent 6%), var(--pp-navy);
+  }
+  .pp-cover-t { font-family: var(--pp-serif); font-weight: 600; font-size: clamp(1.5rem, 8.4vw, 2.1rem); letter-spacing: .18em; text-indent: .18em; text-transform: uppercase; line-height: 1; }
+  .pp-cover-b { font-family: var(--pp-serif); font-style: italic; font-size: clamp(1.35rem, 7.4vw, 1.8rem); line-height: 1.15; }
+  .pp-emblem { width: 52%; height: auto; filter: drop-shadow(0 1px 0 rgba(0, 0, 0, .45)); }
+  .pp-page {
+    display: flex; flex-direction: column; height: 100%; padding: 6% 6.5% 4.5%; color: var(--pp-ink); font-family: var(--font-data); text-align: left;
+    background: repeating-radial-gradient(circle at 18% 28%, rgba(52, 84, 140, .08) 0 1px, transparent 1px 9px),
+      repeating-radial-gradient(circle at 88% 78%, rgba(150, 64, 80, .065) 0 1px, transparent 1px 11px),
+      linear-gradient(90deg, rgba(0, 0, 0, .14), transparent 5%), var(--pp-page);
+  }
+  .pp-top { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; padding-bottom: .3rem; border-bottom: 1px solid currentColor; font-size: .62rem; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
+  .pp-foot { display: flex; justify-content: space-between; margin-top: auto; padding-top: .3rem; font-size: .58rem; letter-spacing: .1em; text-transform: uppercase; opacity: .75; }
+  .pp-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 2.5% 3%; padding-block: 4% 1%; }
+  .pp-stamp {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .18rem; min-width: 0; min-height: 0; padding: .3rem .25rem; overflow: hidden;
+    color: var(--k); border: 2px solid currentColor; box-shadow: inset 0 0 0 1.5px var(--pp-page), inset 0 0 0 2.5px currentColor; transform: rotate(var(--r)); opacity: .93;
+    text-align: center; font-size: .54rem; font-weight: 700; line-height: 1.08; letter-spacing: .02em; text-transform: uppercase; overflow-wrap: anywhere;
+  }
+  .pp-stamp.s0 { border-radius: 50%; padding-inline: .5rem; }
+  .pp-stamp.s1 { border-radius: .45rem; }
+  .pp-stamp.s2 { border-radius: 46% / 36%; padding-inline: .45rem; }
+  .pp-stamp img { width: 44%; aspect-ratio: 3 / 2; object-fit: contain; flex: none; filter: drop-shadow(0 0 .5px rgba(0, 0, 0, .7)); }
+  .pp-golds { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); align-items: center; gap: 4% 6%; padding-block: 5% 1%; }
+  .pp-gold {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .16rem; width: 100%; aspect-ratio: 1.1; min-width: 0; min-height: 0; padding: .35rem .3rem; overflow: hidden;
+    color: var(--pp-ink-gold); background: rgba(207, 174, 102, .2); border: 2.5px solid currentColor; border-radius: 50% / 44%;
+    box-shadow: inset 0 0 0 2px var(--pp-page), inset 0 0 0 3.2px currentColor; transform: rotate(var(--r));
+    text-align: center; text-transform: uppercase; font-weight: 700; line-height: 1.1;
+  }
+  .pp-gold svg { width: 19%; height: auto; flex: none; }
+  .pp-gold b { font-size: .7rem; letter-spacing: .04em; white-space: nowrap; }
+  .pp-gold span { font-size: .52rem; letter-spacing: .04em; white-space: nowrap; }
+  .pp-none { flex: 1; display: grid; place-items: center; text-align: center; font-family: var(--pp-serif); font-style: italic; font-size: 1.05rem; line-height: 1.3; opacity: .8; padding-inline: 8%; }
+  .pp-id { display: grid; grid-template-columns: 36% minmax(0, 1fr); gap: 6%; padding-top: 6%; }
+  .pp-photo { aspect-ratio: 4 / 5; display: grid; place-items: center; border: 1px solid currentColor; background: rgba(255, 255, 255, .55); font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif; font-size: clamp(2.2rem, 13vw, 3.3rem); line-height: 1; }
+  .pp-f { display: block; font-size: .47rem; letter-spacing: .05em; text-transform: uppercase; opacity: .72; }
+  .pp-v { display: block; margin-bottom: .42rem; font-size: .76rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; line-height: 1.2; overflow-wrap: anywhere; }
+  .pp-sign { margin-top: 5%; padding: 0 .2rem .05rem; border-bottom: 1px solid currentColor; font-family: var(--pp-hand); font-size: 1.45rem; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pp-mrz { margin-top: auto; padding-top: .5rem; font-size: clamp(.5rem, 2.85vw, .66rem); font-weight: 700; letter-spacing: .07em; line-height: 1.55; white-space: nowrap; overflow: hidden; }
+  /* Larger text leaves the booklet's own lettering as it was */
+  :root[data-text="large"] .pp-gold b { font-size: .622rem; }
+  :root[data-text="large"] .pp-gold span { font-size: .462rem; }
+  :root[data-text="large"] .pp-top { font-size: 0.551rem; }
+  :root[data-text="large"] .pp-foot { font-size: 0.516rem; }
+  :root[data-text="large"] .pp-stamp { font-size: 0.48rem; }
+  :root[data-text="large"] .pp-none { font-size: 0.933rem; }
+  :root[data-text="large"] .pp-f { font-size: 0.418rem; }
+  :root[data-text="large"] .pp-v { font-size: 0.676rem; }
+  :root[data-text="large"] .pp-sign { font-size: 1.289rem; }
+  .fx-meter { height: 8px; border-radius: 4px; background: var(--rule); overflow: hidden; }
+  .fx-meter i { display: block; height: 100%; border-radius: 4px; background: var(--verdigris); }
+  .fx-share { margin: 0; padding: .7rem .85rem; border: 1.5px dashed var(--rule); border-radius: 12px; background: var(--paper-lo); color: var(--ink); font-family: var(--font-body); font-size: .95rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; -webkit-user-select: all; user-select: all; }
+
+  /* Tables in the log and on the scoring screen */
+  .fx-ledger td, .fx-ledger th { padding: .4rem 0; vertical-align: baseline; text-align: left; font-weight: 400; }
+  .fx-ledger td:last-child { text-align: right; font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; padding-left: .75rem; }
+  .fx-ledger tr + tr td, .fx-ledger tr + tr th { border-top: 1px solid var(--rule); }
+  .fx-ledger tr.total td, .fx-ledger tr.total th { border-top: 1.5px solid var(--ink); font-weight: 700; }
+
+  @keyframes fx-stamp { 0% { transform: rotate(-5deg) scale(1.7); opacity: 0; } 100% { transform: rotate(-5deg) scale(1); opacity: 1; } }
+  @keyframes fx-seal { 0% { transform: rotate(-3deg) scale(1.7); opacity: 0; } 100% { transform: rotate(-3deg) scale(1); opacity: 1; } }
+  @keyframes fx-rise { 0% { opacity: 0; transform: translateY(6px); } 100% { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .fx-stamp, .fx-perfect, .fx-flag, .pp-leaf.out, .pp-leaf.in { animation: none; }
+    .fx-opt, .fx-go, .fx-hint, button.fx-ava { transition: none; }
+  }
+</style>
+
+<div class="mx-auto max-w-5xl px-4 py-4 sm:py-6">
+  <div id="app"></div>
+  <p class="fx-label mt-5 text-center" style="text-transform:none;letter-spacing:.02em">
+    Flag artwork: public-domain drawings from the country-flags project. Country facts: mledoze/countries. Population: World Bank, 2025.
+  </p>
+</div>
+
+<script>window.FX_DATA = /*__DATA__*/null;</script>
+<script>
+(() => {
+  'use strict';
+
+  /* ---------- Rules: change these numbers to rebalance the game ---------- */
+  const ROUND = 10;                 // flags per round
+  const SEATS = 8;                  // most players in a pass-and-play game
+  const BASE = 100;                 // an unaided correct guess
+  const FLOOR = 10;                 // least a correct guess can pay, however many hints
+  const BONUS = 50;                 // a correct bonus answer
+  const HINTS = [
+    { id: 'continent', label: 'Continent', cost: 20 },
+    { id: 'capital',   label: 'Capital',   cost: 40 },
+    { id: 'fifty',     label: '50/50',     cost: 50 }
+  ];
+  const STREAK = [[7, 30], [5, 20], [3, 10]];   // the streak is flags named with no hints in a row; from N in a row each one pays this much extra
+  const CLOCK = 15;                             // seconds per flag when playing against the clock
+  const SPEED = [[3, 30], [6, 15]];             // against the clock: answer within N seconds for this much extra
+  const WAGERS = [100, 250];                    // what can be risked on the final flag
+  const RANKS = [[1600, 'World Ambassador'], [1200, 'Globetrotter'], [800, 'Frequent Flyer'], [400, 'Weekend Tripper'], [0, 'Tourist']];
+  // The easier pool: flags most people have seen.
+  const KNOWN = new Set(('US CA MX BR AR CL CO PE CU JM UY VE GB IE FR DE IT ES PT NL BE CH AT SE NO DK FI IS PL CZ HU GR TR RU UA HR RO ' +
+    'CN JP KR KP IN PK BD TH VN PH ID MY SG SA AE IL IR IQ NP LK EG MA NG KE ZA GH ET TN DZ AU NZ ' +
+    'PA CR DO EC BG RS AL TW QA LB SN CM').split(' '));   // 80 in all, so eight players can have ten each
+
+  /* ---------- Data ---------- */
+  const D = window.FX_DATA;
+  const CONTS = ['Africa', 'Asia', 'Europe', 'North America', 'South America', 'Oceania'];
+  const C = {}, POOL = [];
+  for (const r of D.c) {
+    C[r[0]] = { a2: r[0], name: r[1], cap: r[2], cont: r[3], sub: r[4], pop: r[5], lat: r[6], lng: r[7],
+      borders: r[8] ? r[8].split(' ') : [], decoys: r[9].split(' '), ar: r[10] };
+    POOL.push(r[0]);
+  }
+  const POOLS = {
+    known: { label: 'Well-known flags', short: 'well-known', codes: POOL.filter(a => KNOWN.has(a)) },
+    world: { label: 'Whole world', short: 'whole world', codes: POOL }
+  };
+  const urlCache = {};
+  const flagURL = a2 => urlCache[a2] || (urlCache[a2] = D.f[a2].startsWith('data:') ? D.f[a2] : 'data:image/svg+xml,' + encodeURIComponent(D.f[a2]));
+
+  // Countries that span two continents: the hint says so, and they never get a continent bonus question.
+  const CONT_NOTE = { RU: 'Europe and Asia', TR: 'Asia and Europe', KZ: 'Asia and Europe' };
+  const NO_CONT_Q = new Set(['RU', 'TR', 'KZ', 'AZ', 'GE', 'AM', 'CY', 'EG']);
+  // Countries whose capital is disputed or shared between cities never get a capital bonus question.
+  const NO_CAP_Q = new Set(['ZA', 'BO', 'LK', 'SZ', 'IL', 'PS']);
+  // Famous cities that are not the capital: the most tempting wrong answers.
+  const BIG = { AU: ['Sydney', 'Melbourne'], NZ: ['Auckland'], CA: ['Toronto', 'Montreal'], US: ['New York'], BR: ['Rio de Janeiro', 'São Paulo'],
+    TR: ['Istanbul'], CH: ['Zurich', 'Geneva'], MA: ['Casablanca'], NG: ['Lagos'], IN: ['Mumbai'], PK: ['Karachi'], VN: ['Ho Chi Minh City'],
+    TZ: ['Dar es Salaam'], CI: ['Abidjan'], MM: ['Yangon'], KZ: ['Almaty'], AE: ['Dubai'], CN: ['Shanghai'], DE: ['Munich'], IT: ['Milan'],
+    ES: ['Barcelona'], NL: ['Rotterdam'], SA: ['Jeddah'], EC: ['Guayaquil'], CO: ['Medellín'], CL: ['Valparaíso'], PE: ['Cusco'],
+    KE: ['Mombasa'], EG: ['Alexandria'], GH: ['Kumasi'], CM: ['Douala'], BJ: ['Cotonou'], MW: ['Blantyre'], KR: ['Busan'], JP: ['Osaka', 'Kyoto'],
+    RU: ['Saint Petersburg'], PL: ['Kraków'], PT: ['Porto'], GR: ['Thessaloniki'], NO: ['Bergen'], SE: ['Gothenburg'], HR: ['Dubrovnik'],
+    SY: ['Aleppo'], UZ: ['Samarkand'], LY: ['Benghazi'], BZ: ['Belize City'], PW: ['Koror'], BI: ['Bujumbura'], ZW: ['Bulawayo'],
+    CD: ['Lubumbashi'], CG: ['Pointe-Noire'], BD: ['Chittagong'], FJ: ['Nadi'], JM: ['Montego Bay'], TH: ['Chiang Mai'], ID: ['Surabaya'],
+    LT: ['Kaunas'], EE: ['Tartu'], CZ: ['Brno'], AT: ['Salzburg'], BE: ['Antwerp'], IE: ['Cork'], ME: ['Cetinje'], YE: ['Aden'] };
+
+  /* ---------- Avatars: add or remove entries freely ---------- */
+  const AVATARS = {
+    animals: [['🦊', 'Fox'], ['🐼', 'Panda'], ['🦁', 'Lion'], ['🐯', 'Tiger'], ['🐸', 'Frog'], ['🐙', 'Octopus'], ['🦉', 'Owl'], ['🐧', 'Penguin'],
+      ['🐨', 'Koala'], ['🐵', 'Monkey'], ['🐶', 'Dog'], ['🐱', 'Cat'], ['🦄', 'Unicorn'], ['🐢', 'Turtle'], ['🦈', 'Shark'], ['🐬', 'Dolphin'],
+      ['🦖', 'T. rex'], ['🦒', 'Giraffe'], ['🦓', 'Zebra'], ['🐘', 'Elephant'], ['🦜', 'Parrot'], ['🦔', 'Hedgehog'], ['🐻', 'Bear'], ['🐰', 'Rabbit'],
+      ['🐷', 'Pig'], ['🐮', 'Cow'], ['🐔', 'Chicken'], ['🦆', 'Duck'], ['🦅', 'Eagle'], ['🐺', 'Wolf'], ['🐴', 'Horse'], ['🐲', 'Dragon'],
+      ['🐝', 'Bee'], ['🦋', 'Butterfly'], ['🐳', 'Whale'], ['🦥', 'Sloth'], ['🦦', 'Otter'], ['🦩', 'Flamingo']],
+    faces: [['😎', 'Cool face'], ['🤓', 'Nerd face'], ['🤪', 'Zany face'], ['🙃', 'Upside-down face'], ['😜', 'Cheeky face'], ['🤯', 'Mind blown'],
+      ['🥳', 'Party face'], ['🤩', 'Star-struck face'], ['😈', 'Little devil'], ['🤑', 'Money face'], ['😴', 'Sleepy face'], ['🥶', 'Frozen face'],
+      ['🤔', 'Thinking face'], ['😏', 'Smirk'], ['🧐', 'Monocle face'], ['😬', 'Grimace'], ['🙄', 'Eye roll'], ['🤠', 'Cowboy']],
+    characters: [['🤖', 'Robot'], ['👽', 'Alien'], ['👻', 'Ghost'], ['👾', 'Arcade alien'], ['🤡', 'Clown'], ['🎃', 'Pumpkin head'], ['⛄', 'Snowman'],
+      ['🧙', 'Wizard'], ['🧛', 'Vampire'], ['🧜', 'Merperson'], ['🧞', 'Genie'], ['🧟', 'Zombie'], ['🦸', 'Superhero'], ['🦹', 'Supervillain'],
+      ['🧚', 'Fairy'], ['🎅', 'Santa'], ['💩', 'Poo']]
+  };
+  // A random hand of eight: four animals, two funny faces, two characters.
+  const dealHand = () => shuffle([...shuffle(AVATARS.animals).slice(0, 4), ...shuffle(AVATARS.faces).slice(0, 2), ...shuffle(AVATARS.characters).slice(0, 2)]);
+  const cleanName = v => String(v).replace(/\s+/g, ' ').trim().slice(0, 14);
+  // A picture nobody in the pass-and-play line-up is using yet.
+  function spareAvatar() {
+    const used = new Set([P && P.avatar, ...O.guests.map(g => g.avatar)]);
+    const free = Object.values(AVATARS).flat().map(a => a[0]).filter(e => !used.has(e));
+    return free[Math.floor(Math.random() * free.length)];
+  }
+
+  /* ---------- Small helpers ---------- */
+  const esc = s => String(s).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+  const fmt = n => n.toLocaleString('en-US');
+  const signed = n => (n > 0 ? '+' : n < 0 ? '−' : '') + fmt(Math.abs(n));
+  const listOf = a => a.length < 3 ? a.join(' and ') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+    const plain = s => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+  // Chance. Normally Math.random; the daily challenge swaps in a generator seeded by the date, so everyone gets the same round.
+  let rand = Math.random;
+  function seeded(seed) {
+    let a = seed >>> 0;
+    return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+  const hashStr = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+  const shuffle = a => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  // Picks n items from a best-first list, favouring the front of it.
+  function weightedPick(list, n) {
+    const items = list.map((v, i) => ({ v, w: Math.pow(i + 1, -1.3) })), out = [];
+    while (out.length < n && items.length) {
+      let t = rand() * items.reduce((s, x) => s + x.w, 0), k = 0;
+      while (k < items.length - 1 && (t -= items[k].w) > 0) k++;
+      out.push(items.splice(k, 1)[0].v);
+    }
+    return out;
+  }
+  const mem = {};   // stands in when the browser refuses storage, so a session still works
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); if (v) return JSON.parse(v); } catch (e) { /* fall through */ } return k in mem ? mem[k] : d; },
+    set(k, v) { mem[k] = v; try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable: kept in memory only */ } }
+  };
+  const coords = c => `${Math.abs(c.lat)}°${c.lat >= 0 ? 'N' : 'S'} ${Math.abs(c.lng)}°${c.lng >= 0 ? 'E' : 'W'}`;
+  const THE = new Set(['US', 'GB', 'NL', 'PH', 'BS', 'MV', 'SC', 'SB', 'MH', 'KM', 'GM', 'CF', 'DO', 'AE', 'CG', 'CD']);
+  const the = c => (THE.has(c.a2) ? 'the ' : '') + c.name;
+  const contName = c => CONT_NOTE[c.a2] || CONTS[c.cont];
+  function fmtPop(n) {
+    const two = x => (x >= 10 ? Math.round(x) : Math.round(x * 10) / 10);
+    if (n >= 9.95e8) return two(n / 1e9) + ' billion';
+    if (n >= 9.95e5) return two(n / 1e6) + ' million';
+    return fmt(Number(n.toPrecision(2)));
+  }
+  const pad2 = n => String(n).padStart(2, '0');
+  const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
+  const todayLabel = () => { const d = new Date(); return `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()]} ${d.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()]}`; };
+
+  /* ---------- Scoring ---------- */
+  const flagWorth = hints => Math.max(FLOOR, BASE - hints.reduce((s, id) => s + HINTS.find(h => h.id === id).cost, 0));
+  const streakBonus = n => (STREAK.find(t => n >= t[0]) || [0, 0])[1];
+  const speedBonus = secs => (SPEED.find(t => secs <= t[0]) || [0, 0])[1];
+  const entryTotal = e => e.pts + e.bonusPts + e.streakPts + e.speedPts + e.wagerPts;
+  function totals(log) {
+    const sum = k => log.reduce((s, e) => s + e[k], 0), named = log.filter(e => e.ok).length;
+    return { named, base: named * BASE, cost: sum('cost'), bonus: sum('bonusPts'), bonusWon: log.filter(e => e.bonus === 'won').length,
+      streak: sum('streakPts'), speed: sum('speedPts'), wager: sum('wagerPts') };
+  }
+  const rankFor = score => RANKS.find(r => score >= r[0])[1];
+
+  /* ---------- Sound and celebration ---------- */
+  let muted = store.get('fx-mute', false), ac = null, master = null, keepAlive = null;
+  const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform || ''));      // iPhone and iPad
+  function audio() {
+    if (muted) return null;
+    try {
+      if (!ac) {
+        ac = new (window.AudioContext || window.webkitAudioContext)();
+        // Everything plays through one volume stage with a limiter after it, so sounds are loud on a phone speaker without crackling.
+        const limiter = ac.createDynamicsCompressor();
+        master = ac.createGain(); master.gain.value = 2.6;
+        master.connect(limiter); limiter.connect(ac.destination);
+      }
+      if (ac.state !== 'running') ac.resume();      // browsers start it paused, and iOS pauses it again after a call or a lock
+      return ac;
+    } catch (e) { return null; }
+  }
+  // One second of silence as a sound file, built on the spot.
+  function silentWav() {
+    const n = 8000, buf = new ArrayBuffer(44 + n), v = new DataView(buf), put = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+    put(0, 'RIFF'); v.setUint32(4, 36 + n, true); put(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); put(36, 'data'); v.setUint32(40, n, true);
+    const bytes = new Uint8Array(buf); bytes.fill(128, 44);
+    return bytes;
+  }
+  // Every touch makes sure sound is awake. An iPhone or iPad treats a web page's sound effects as "ambient", which the ringer switch silences.
+  // Two ways to ask for them to be treated as media instead: the audio-session setting where the device offers it, otherwise a silent clip kept playing.
+  function wake() {
+    if (muted) return;
+    audio();
+    try {
+      if (navigator.audioSession) { if (navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; return; }
+    } catch (e) { /* not allowed here: fall through to the clip */ }
+    if (!IOS) return;
+    try {
+      if (!keepAlive) {
+        const bytes = silentWav();
+        keepAlive = document.createElement('audio');
+        keepAlive.setAttribute('x-webkit-airplay', 'deny'); keepAlive.setAttribute('playsinline', ''); keepAlive.preload = 'auto'; keepAlive.loop = true;
+        keepAlive.addEventListener('error', () => {      // if this page may not play the clip from memory, try it as inline data once
+          if (keepAlive.dataset.tried) return;
+          keepAlive.dataset.tried = '1';
+          let bin = ''; for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+          keepAlive.src = 'data:audio/wav;base64,' + btoa(bin);
+        });
+        keepAlive.src = URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }));
+      }
+      if (keepAlive.paused) { const p = keepAlive.play(); if (p && p.catch) p.catch(() => {}); }
+    } catch (e) { /* sound is a nicety */ }
+  }
+  // Hand the device's sound back: stop the clip and return the audio session to its default.
+  const hush = () => {
+    try { if (keepAlive) keepAlive.pause(); } catch (e) { /* nothing to stop */ }
+    try { if (navigator.audioSession && navigator.audioSession.type === 'playback') navigator.audioSession.type = 'auto'; } catch (e) { /* leave it */ }
+  };
+  ['touchend', 'click', 'keydown'].forEach(t => document.addEventListener(t, wake, { capture: true, passive: true }));
+  document.addEventListener('visibilitychange', () => { if (document.hidden) hush(); });
+  function note(freq, at, dur, type, vol, slideTo) {
+    const a = audio(); if (!a) return;
+    try {
+      const t = a.currentTime + at, o = a.createOscillator(), g = a.createGain();
+      o.type = type || 'triangle'; o.frequency.setValueAtTime(freq, t);
+      if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol || .14, t + .012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + .03);
+    } catch (e) { /* sound is a nicety: never let it break a turn */ }
+  }
+  const run = (freqs, gap, at) => freqs.forEach((f, i) => note(f, (at || 0) + i * gap, i === freqs.length - 1 ? .32 : gap + .05));
+  const SFX = {
+    tap: () => note(520, 0, .06, 'square', .07),
+    hint: () => { note(440, 0, .09, 'sine', .1); note(330, .08, .14, 'sine', .1); },
+    thud: () => { note(95, 0, .13, 'sine', .32, 48); note(210, 0, .07, 'triangle', .12, 120); },
+    right: () => { SFX.thud(); note(659, .05, .12); note(988, .15, .24); },
+    wrong: () => { SFX.thud(); note(196, .05, .3, 'sawtooth', .08, 110); },
+    timeout: () => { note(330, 0, .16, 'square', .06); note(220, .16, .34, 'square', .06); },
+    streak: n => run(n >= 7 ? [523, 659, 784, 1047, 1319] : n >= 5 ? [523, 659, 784, 1047] : [523, 659, 784], .08, .42),
+    bonus: () => run([784, 1047, 1319], .09),
+    tick: () => note(1250, 0, .04, 'square', .07),
+    wagerWin: () => run([659, 784, 988, 1319, 1568], .09, .42),
+    wagerLose: () => { note(294, .3, .22, 'sawtooth', .08, 147); note(147, .52, .45, 'sawtooth', .08, 98); },
+    finish: () => run([392, 523, 659], .14),
+    fanfare: () => run([523, 659, 784, 1047, 784, 1047, 1319], .13),
+    perfect: () => { run([523, 659, 784, 1047], .11); run([587, 740, 880, 1175], .11, .5); run([659, 831, 988, 1319], .11, 1); [1047, 1319, 1568, 2093].forEach(f => note(f, 1.5, .9, 'triangle', .13)); },
+    page: () => note(190, 0, .17, 'triangle', .06, 85)
+  };
+  function confetti(gold) {
+    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const cv = document.createElement('canvas'), ctx = cv.getContext && cv.getContext('2d');
+    if (!ctx) return;
+    cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:50';
+    document.body.appendChild(cv);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2), W = cv.width = innerWidth * dpr, H = cv.height = innerHeight * dpr;
+    const css = getComputedStyle(document.documentElement);
+    const cols = gold ? ['#C9A24A', '#E2BE6A', '#F3DC98', '#A8842E', '#FFF6DA'] : ['--madder', '--verdigris', '--gold', '--navy', '--sea'].map(v => css.getPropertyValue(v).trim());   // a perfect round rains gold, and for longer
+    const bits = Array.from({ length: gold ? 260 : 120 }, () => ({ x: Math.random() * W, y: -Math.random() * H * (gold ? 1.5 : .35), vx: (Math.random() - .5) * 4 * dpr, vy: (2 + Math.random() * 4) * dpr,
+      s: (6 + Math.random() * 7) * dpr, r: Math.random() * 6.3, vr: (Math.random() - .5) * .3, c: cols[Math.floor(Math.random() * cols.length)] }));
+    const t0 = performance.now(), LIFE = gold ? 5600 : 2800;
+    (function frame(t) {
+      const age = t - t0;
+      ctx.clearRect(0, 0, W, H);
+      for (const p of bits) {
+        p.x += p.vx; p.y += p.vy; p.vy += .05 * dpr; p.r += p.vr;
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.globalAlpha = Math.max(0, Math.min(1, (LIFE - age) / 600)); ctx.fillStyle = p.c;
+        ctx.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); ctx.restore();
+      }
+      if (age < LIFE) requestAnimationFrame(frame); else cv.remove();
+    })(t0);
+  }
+
+  /* ---------- Saved things (all in this browser only) ---------- */
+  let S = { screen: 'start' };
+  let P = null;                                               // the current player: { name, avatar }
+  let O = { mode: 'daily', pool: 'world', clock: false, each: 5, guests: [] };     // game choices for the player now at the controls
+  let M = null;                                               // a pass-and-play game in progress: { seats: [{ P, S }], turn, first, each, over }
+  // Each player's own choice of flags and clock is remembered under their name, so a shared device suits everyone.
+  function prefsOf(name) {
+    const saved = store.get('fx-prefs', {})[plain(name)] || {};
+    return { pool: saved.pool === 'known' ? 'known' : 'world', clock: saved.clock === true };
+  }
+  function savePrefs() { const all = store.get('fx-prefs', {}); all[plain(P.name)] = { pool: O.pool, clock: O.clock }; store.set('fx-prefs', all); }
+
+  const ORD = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
+  const byScore = (a, b) => b.score - a.score || a.t - b.t;
+  // High-score tables: one per flag pool, plus one for today's challenge. Every finished round is an entry.
+  function dailyData() { const d = store.get('fx-daily', null); return d && d.date === todayKey() && Array.isArray(d.rows) ? d : { date: todayKey(), rows: [] }; }
+  const playedToday = name => dailyData().rows.find(r => plain(r.name) === plain(name)) || null;
+  function tableRows(table) {
+    const rows = table === 'daily' ? dailyData().rows : (store.get('fx-tables', {})[table] || []);
+    return rows.filter(r => r && r.name && (table === 'daily' || r.score > 0)).sort(byScore).slice(0, 10);
+  }
+  const bestKey = (table, name) => table + '|' + plain(name);
+  const bestFor = (table, name) => store.get('fx-bests', {})[bestKey(table, name)] || { score: 0, streak: 0 };
+  // A perfect round: all ten flags and all ten bonus questions in one recorded ten-flag round. The wager plays no part.
+  // (A bonus question only opens for a flag named with no hints, so ten bonuses won also means no hints at all.)
+  const isPerfect = r => !r.practice && r.record !== false && r.round.length === ROUND && r.log.length === ROUND && r.log.every(e => e.ok && e.bonus === 'won');
+  const perfects = name => store.get('fx-perfect', {})[plain(name)] || [];
+  function addPerfect(entry) { const all = store.get('fx-perfect', {}), k = plain(P.name); all[k] = [...(all[k] || []), entry]; store.set('fx-perfect', all); }
+  const STAR = `<svg class="fx-gold-star" viewBox="0 0 20 20" width="15" height="15" role="img" aria-label="Perfect round"><path d="M10 1.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8L10 14.9l-5.2 2.7 1-5.8L1.6 7.7l5.8-.8z" fill="var(--gold)" stroke="var(--ochre)" stroke-width="1" stroke-linejoin="round"/></svg>`;
+  // The passport: every flag a player has named correctly.
+  const stamps = name => store.get('fx-passport', {})[plain(name)] || [];
+  function addStamp(a2) {
+    const all = store.get('fx-passport', {}), k = plain(P.name), list = all[k] || [];
+    if (list.includes(a2)) return false;
+    all[k] = [...list, a2]; store.set('fx-passport', all);
+    return true;
+  }
+
+  function startScreen(fresh) {
+    const hand = dealHand(), last = fresh ? null : P || store.get('fx-player', null);
+    S = { screen: 'start', hand, name: last ? last.name : '', avatar: last ? last.avatar : hand[0][0] };
+    M = null;
+  }
+  function choosePlayer(name, avatar) {
+    P = { name, avatar };
+    store.set('fx-player', P);
+  }
+  // Screen 2 opens on today's challenge until this player has played it.
+  function openRules() {
+    if (S.screen !== 'start') startScreen();
+    M = null;
+    Object.assign(O, prefsOf(P.name));
+    O.mode = playedToday(P.name) ? 'free' : 'daily';
+    // The people who last played pass and play on this device are offered again.
+    const party = store.get('fx-party', {});
+    O.each = party.each === ROUND ? ROUND : 5;
+    O.guests = (Array.isArray(party.guests) ? party.guests : []).filter(g => g && cleanName(g.name || '') && g.avatar && plain(cleanName(g.name)) !== plain(P.name))
+      .slice(0, SEATS - 1).map(g => ({ name: cleanName(g.name), avatar: g.avatar }));
+    tidyParty();
+    S.screen = 'rules';
+  }
+  const modeLabel = () => S.mode === 'daily' ? `Today's challenge` : `${S.party ? 'Pass and play · ' : ''}${POOLS[S.table].label}${S.clock ? ' · clock' : ''}`;
+
+  /* ---------- A round ---------- */
+  // Everything about a round is decided up front, which is what lets the daily challenge be identical for everyone.
+  function buildRound(codes) {
+    let bag = [];
+    return codes.map(a2 => {
+      const c = C[a2];
+      // One wrong answer always comes from the two closest look-alikes; the other two lean towards the front of the list.
+      const [lead] = weightedPick(c.decoys.slice(0, 2), 1);
+      const rest = weightedPick(c.decoys.filter(d => d !== lead), 2);
+      const options = shuffle([a2, lead, ...rest]);
+      // The four kinds of bonus question are dealt from a shuffled hand so they keep rotating.
+      const can = { capital: capOK(c), continent: !NO_CONT_Q.has(a2), population: true, neighbour: c.borders.length > 0 };
+      let k = bag.findIndex(t => can[t]);
+      if (k < 0) { bag = shuffle(Object.keys(BONUS_MAKERS)); k = bag.findIndex(t => can[t]); }
+      return { a2, options, lead, bonus: BONUS_MAKERS[bag.splice(k, 1)[0]](c) };
+    });
+  }
+
+  // The deck. This device remembers the order in which flags were last shown. Flags never shown come first, then the
+  // ones shown longest ago, and the most recently shown half of the set sits out whenever the set is big enough to allow it.
+  function seenList() {
+    const out = [];
+    for (const a of store.get('fx-seen', []).filter(a => C[a]).reverse()) if (!out.includes(a)) out.unshift(a);
+    return out;
+  }
+  function deck(pool, need) {
+    const seen = seenList(), never = shuffle(pool.filter(a => !seen.includes(a))), old = seen.filter(a => pool.includes(a));
+    return shuffle([...never, ...old].slice(0, Math.min(pool.length, Math.max(need, Math.ceil(pool.length / 2)))));
+  }
+  const markSeen = codes => store.set('fx-seen', [...seenList().filter(a => !codes.includes(a)), ...codes]);
+
+  function newRound() {
+    const daily = O.mode === 'daily';
+    let codes;
+    if (daily) {
+      // Seeded by the date: five well-known flags and five from the rest of the world.
+      rand = seeded(hashStr('flag-explorer ' + todayKey()));
+      codes = shuffle([...shuffle(POOLS.known.codes).slice(0, 5), ...shuffle(POOL.filter(a => !KNOWN.has(a))).slice(0, 5)]);
+    } else {
+      codes = deck(POOLS[O.pool].codes, ROUND).slice(0, ROUND);
+      markSeen(codes);
+    }
+    const round = buildRound(codes);
+    rand = Math.random;
+    M = null;
+    S = roundState(round, P.name, { mode: daily ? 'daily' : 'free', table: daily ? 'daily' : O.pool, clock: !daily && !!O.clock, practice: daily && !!playedToday(P.name) });
+    startQuestion();
+  }
+  // One player's round. A player new to this device gets a single tip on their first flag.
+  function roundState(round, name, more) {
+    return Object.assign({ screen: 'play', mode: 'free', table: O.pool, clock: !!O.clock, practice: false, round, i: 0, score: 0, streak: 0, topStreak: 0, log: [], q: null,
+      confirmEnd: false, newBest: false, newStamps: 0, place: 0, entryT: 0, perfect: false, tip: !store.get('fx-tipped', []).includes(plain(name)) }, more);
+  }
+
+  /* ---------- Pass and play: two to eight players on one device, one flag a turn ---------- */
+  // Everyone gets different flags, but flag for flag they come off the same shelf (well-known or not), so nobody is dealt an easier game.
+  function dealMatch(n, each) {
+    const fresh = deck(POOLS[O.pool].codes, n * each);
+    const shelves = [shuffle(fresh.filter(a => KNOWN.has(a))), shuffle(fresh.filter(a => !KNOWN.has(a)))];
+    const hands = Array.from({ length: n }, () => []);
+    for (let k = 0; k < each; k++) {
+      const [a, b] = shelves.map(x => x.length);
+      let shelf = a >= n && b >= n ? shelves[rand() * (a + b) < a ? 0 : 1] : a >= n ? shelves[0] : b >= n ? shelves[1] : null;
+      if (!shelf) { shelf = shelves[0] = shuffle([...shelves[0], ...shelves[1]]); shelves[1] = []; }   // neither shelf can serve everyone: mix what is left
+      for (const h of hands) h.push(shelf.pop());
+    }
+    markSeen(hands.flat());
+    return hands;
+  }
+  // Every player needs flags of their own, so a long game for a big group has to fit inside the chosen set.
+  const canLong = () => (O.guests.length + 1) * ROUND <= POOLS[O.pool].codes.length;
+  function tidyParty() { if (!canLong()) O.each = 5; }
+  const partyError = () => {
+    const names = [P.name, ...O.guests.map(g => cleanName(g.name))];
+    if (names.length < 2) return 'Add at least one more player.';
+    if (names.some(n => !n)) return 'Give every player a name.';
+    if (new Set(names.map(plain)).size < names.length) return 'Two players share a name. Change one so their scores stay apart.';
+    return '';
+  };
+  // Seat 0 is always the player who set the game up. `first` says who opens, and moves on by one for a rematch.
+  function startMatch(first) {
+    O.guests = O.guests.map(g => ({ name: cleanName(g.name), avatar: g.avatar })); tidyParty();
+    store.set('fx-party', { each: O.each, guests: O.guests });
+    const people = [P, ...O.guests], hands = dealMatch(people.length, O.each);
+    const seats = people.map((who, k) => ({ P: { name: who.name, avatar: who.avatar }, S: roundState(buildRound(hands[k]), who.name, { party: true, record: O.each === ROUND }) }));
+    M = { seats, turn: 0, first: first % seats.length, each: O.each, over: false };
+    takeSeat(M.first);
+  }
+  function takeSeat(k) { M.turn = k; S = M.seats[k].S; P = M.seats[k].P; S.screen = 'pass'; S.confirmEnd = false; }
+  // After a turn: the same player's next flag waits until the device has been round the table.
+  function passOn() {
+    if (S.i >= S.round.length - 1) S.done = true; else { S.i++; S.q = null; }
+    if (M.seats.every(seat => seat.S.done)) return endMatch();
+    takeSeat((M.turn + 1) % M.seats.length);
+  }
+  function endMatch() {
+    for (const seat of M.seats) { S = seat.S; P = seat.P; closeRound(); S.q = null; S.done = true; S.screen = 'match'; }
+    M.over = true; M.turn = 0; S = M.seats[0].S; P = M.seats[0].P;
+    if (M.seats.some(seat => seat.S.perfect)) { SFX.perfect(); confetti(true); }
+    else if (Math.max(...M.seats.map(seat => seat.S.score)) > 0) { SFX.fanfare(); confetti(); } else SFX.finish();
+  }
+  // Best score first; players level on points share a place.
+  const standings = () => M.seats.map((seat, k) => ({ k, P: seat.P, S: seat.S })).sort((a, b) => b.S.score - a.S.score || a.k - b.k)
+    .map((r, _, all) => Object.assign(r, { place: 1 + all.filter(o => o.S.score > r.S.score).length }));
+
+  function startQuestion() {
+    const r = S.round[S.i];
+    S.q = { a2: r.a2, options: r.options, lead: r.lead, bonus: Object.assign({}, r.bonus, { pick: null }), hints: [], out: [], pick: null, wager: 0, phase: 'wager', t0: 0 };
+    // The final flag opens with the wager, as long as there is something to risk.
+    if (S.i < S.round.length - 1 || S.score < WAGERS[0]) beginGuess();
+  }
+  function beginGuess() { S.q.phase = 'guess'; S.q.t0 = Date.now(); }
+  function setWager(v) {
+    const q = S.q;
+    if (q.phase !== 'wager' || v > S.score) return;
+    q.wager = v; beginGuess();
+  }
+
+  function useHint(id) {
+    const q = S.q;
+    if (q.phase !== 'guess' || q.wager || q.hints.includes(id)) return;   // no hints on a wagered flag
+    q.hints.push(id);
+    if (id === 'fifty') q.out = q.options.filter(o => o !== q.a2 && o !== q.lead);   // the closest look-alike stays
+    SFX.hint();
+  }
+
+  // a2 is the country picked, or null when the clock ran out.
+  function answer(a2) {
+    const q = S.q;
+    if (q.phase !== 'guess' || (a2 && q.out.includes(a2))) return;
+    if (S.tip) { S.tip = false; store.set('fx-tipped', [...new Set([...store.get('fx-tipped', []), plain(P.name)])]); }   // the first-flag tip is shown once per player
+    q.pick = a2;
+    const ok = a2 === q.a2, secs = (Date.now() - q.t0) / 1000, pts = ok ? flagWorth(q.hints) : 0;
+    const clean = ok && !q.hints.length, run = S.streak;
+    S.streak = clean ? S.streak + 1 : 0;        // a hint ends the streak just as a miss does
+    S.topStreak = Math.max(S.topStreak, S.streak);
+    // The strict rule: the bonus only opens for a correct guess made with no hints at all.
+    const bonus = !ok ? 'none' : q.hints.length ? 'locked' : 'pending';
+    const e = { a2: q.a2, ok, timedOut: a2 === null, hints: [...q.hints], pts, cost: ok ? BASE - pts : 0, bonus, bonusPts: 0, streak: S.streak,
+      streakPts: clean ? streakBonus(S.streak) : 0, runLost: clean ? 0 : run,
+      speedPts: ok && S.clock ? speedBonus(secs) : 0, wagerPts: q.wager ? (ok ? q.wager : -q.wager) : 0 };
+    S.log.push(e);
+    S.score += e.pts + e.streakPts + e.speedPts + e.wagerPts;
+    if (ok && !S.practice && addStamp(q.a2)) S.newStamps++;
+    q.phase = 'result';
+    if (!ok) { if (e.timedOut) SFX.timeout(); else SFX.wrong(); if (q.wager) SFX.wagerLose(); }
+    else { SFX.right(); if (q.wager) SFX.wagerWin(); else if (e.streakPts && STREAK.some(t => t[0] === S.streak)) SFX.streak(S.streak); }
+  }
+
+  function answerBonus(i) {
+    const q = S.q, e = S.log[S.log.length - 1];
+    if (q.phase !== 'bonus') return;
+    q.bonus.pick = i;
+    if (i === q.bonus.answer) { e.bonus = 'won'; e.bonusPts = BONUS; S.score += BONUS; SFX.bonus(); } else { e.bonus = 'lost'; SFX.wrong(); }
+    q.phase = 'bonusResult';
+  }
+
+  function next() {
+    if (S.party) return passOn();
+    if (S.i >= S.round.length - 1) return finish();
+    S.i++; startQuestion();
+  }
+
+  // The bookkeeping at the end of one player's round: personal best and the high-score table.
+  let lastT = 0;
+  function closeRound() {
+    for (const e of S.log) if (e.bonus === 'pending') e.bonus = 'lost';
+    S.place = 0; S.entryT = 0; S.newBest = false; S.perfect = isPerfect(S);
+    if (!S.practice && S.record !== false) {
+      const bests = store.get('fx-bests', {}), key = bestKey(S.table, P.name), prev = bests[key] || { score: 0, streak: 0 };
+      S.newBest = S.score > prev.score && prev.score > 0;
+      bests[key] = { score: Math.max(prev.score, S.score), streak: Math.max(prev.streak, S.topStreak) };
+      store.set('fx-bests', bests);
+      const t = lastT = Math.max(Date.now(), lastT + 1), row = { name: P.name, avatar: P.avatar, score: S.score, streak: S.topStreak, clock: S.clock, t };
+      if (S.perfect) { row.perfect = true; addPerfect({ t, score: S.score, table: S.table, clock: S.clock }); }
+      let list = null;
+      if (S.table === 'daily') {          // today's challenge keeps every first try, even a zero
+        const d = dailyData(); d.rows = [...d.rows, row].sort(byScore); store.set('fx-daily', d); list = d.rows;
+      } else if (S.score > 0) {
+        const tables = store.get('fx-tables', {}); list = tables[S.table] = [...(tables[S.table] || []), row].sort(byScore).slice(0, 10); store.set('fx-tables', tables);
+      }
+      const at = list ? list.findIndex(r => r.t === t) : -1;
+      if (at >= 0 && at < 10 && S.score > 0) { S.place = at + 1; S.entryT = t; }
+    }
+  }
+  function finish() {
+    closeRound();
+    S.screen = 'end'; S.q = null;
+    const t = totals(S.log);
+    // Celebration waits for the results screen, after the last answer of the round (bonus question included).
+    if (S.perfect) { SFX.perfect(); confetti(true); }
+    else if (S.score > 0 && (S.place === 1 || t.named === S.round.length || S.newBest || t.wager > 0)) { SFX.fanfare(); confetti(); } else SFX.finish();
+  }
+
+  /* ---------- Bonus questions ---------- */
+  const capOK = c => !NO_CAP_Q.has(c.a2) && !plain(c.cap).includes(plain(c.name)) && !plain(c.name).includes(plain(c.cap));
+  const BONUS_MAKERS = {
+    capital(c) {
+      const wrong = [...(BIG[c.a2] || [])];
+      const add = a => { const o = C[a]; if (a !== c.a2 && capOK(o) && o.cap !== c.cap && !wrong.includes(o.cap)) wrong.push(o.cap); };
+      shuffle(c.borders).forEach(add);
+      shuffle(POOL.filter(a => C[a].sub === c.sub)).forEach(add);
+      shuffle(POOL.filter(a => C[a].cont === c.cont)).forEach(add);
+      return pack('Capital city', `What is the capital of ${the(c)}?`, c.cap, wrong.slice(0, 3));
+    },
+    continent(c) {
+      const near = { 0: [1, 2, 4], 1: [2, 0, 5], 2: [1, 0, 3], 3: [4, 2, 5], 4: [3, 0, 5], 5: [1, 4, 0] }[c.cont];
+      return pack('Continent', `Which continent is ${the(c)} on?`, CONTS[c.cont], near.map(i => CONTS[i]));
+    },
+    population(c) {
+      // Four answers on a ladder, each four times the last; the true figure sits on a random rung.
+      const rungs = [0, 1, 2, 3].filter(k => c.pop * Math.pow(4, 3 - k) <= 2.2e9 && c.pop / Math.pow(4, k) >= 400);
+      const k = rungs[Math.floor(rand() * rungs.length)];
+      const opts = [0, 1, 2, 3].map(j => 'About ' + fmtPop(c.pop * Math.pow(4, j - k)));
+      return { type: 'population', label: 'Population', prompt: `Roughly how many people live in ${the(c)}?`, options: opts, answer: k, pick: null };
+    },
+    neighbour(c) {
+      const right = c.borders[Math.floor(rand() * c.borders.length)];
+      const ok = a => a !== c.a2 && !c.borders.includes(a);
+      const second = []; c.borders.forEach(b => C[b].borders.forEach(x => { if (ok(x) && !second.includes(x)) second.push(x); }));
+      const wrong = [];
+      [...shuffle(second), ...shuffle(POOL.filter(a => C[a].sub === c.sub)), ...shuffle(POOL.filter(a => C[a].cont === c.cont)), ...shuffle(POOL)]
+        .forEach(a => { if (ok(a) && !wrong.includes(a) && wrong.length < 3) wrong.push(a); });
+      return pack('Neighbour', `Which of these shares a land border with ${the(c)}?`, C[right].name, wrong.map(a => C[a].name));
+    }
+  };
+  function pack(label, prompt, right, wrong) {
+    const options = shuffle([right, ...wrong]);
+    return { type: label.toLowerCase(), label, prompt, options, answer: options.indexOf(right), pick: null };
+  }
+
+  /* ---------- Views ---------- */
+  const COMPASS = size => `<svg class="fx-compass" viewBox="0 0 48 48" width="${size}" height="${size}" aria-hidden="true">
+    <circle cx="24" cy="24" r="22" fill="none" stroke="currentColor" stroke-width="1"/>
+    <circle cx="24" cy="24" r="18.5" fill="none" stroke="currentColor" stroke-width=".5" stroke-dasharray="1 2.2"/>
+    <path d="M24 24 34 14M24 24 34 34M24 24 14 34M24 24 14 14" stroke="currentColor" stroke-width="1.6" fill="none"/>
+    <path d="M24 2.5 27.6 20.4 45.5 24 27.6 27.6 24 45.5 20.4 27.6 2.5 24 20.4 20.4Z" fill="currentColor"/>
+    <path d="M24 2.5 24 24 20.4 20.4ZM45.5 24 24 24 27.6 20.4ZM24 45.5 24 24 27.6 27.6ZM2.5 24 24 24 20.4 27.6Z" class="fx-compass-in"/>
+  </svg>`;
+  let bigText = store.get('fx-text', false);
+  const applyText = () => { if (bigText) document.documentElement.dataset.text = 'large'; else delete document.documentElement.dataset.text; };
+  applyText();
+  const textBtn = () => `<button type="button" class="fx-quiet" style="white-space:nowrap" data-act="text" aria-pressed="${bigText}">${bigText ? 'Standard text' : 'Larger text'}</button>`;
+  const muteBtn = () => `<button type="button" class="fx-quiet" style="padding:0;white-space:nowrap;flex:none" data-act="mute" aria-pressed="${!muted}">Sound ${muted ? 'off' : 'on'}</button>`;
+  const playerHead = () => `<div class="fx-band flex items-center gap-3.5">
+        <span class="fx-ava" style="--s:3.5rem" aria-hidden="true">${esc(P.avatar)}</span>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-baseline justify-between gap-3"><p class="fx-label">Explorer</p>${muteBtn()}</div>
+          <h1 class="fx-h text-4xl fx-clip whitespace-nowrap">${esc(P.name)}</h1>
+        </div>
+      </div>`;
+
+  const viewHand = () => S.hand.map(([e, n]) =>
+    `<button type="button" class="fx-ava" style="--s:3.5rem" data-act="avatar" data-e="${e}" aria-label="${n}" aria-pressed="${e === S.avatar}">${e}</button>`).join('');
+
+  // Screen 1: who is playing
+  function viewStart() {
+    return `<main class="fx-sheet mx-auto max-w-xl">
+      <div class="fx-band flex items-center gap-4" style="padding-block:1.1rem 1.2rem">
+        ${COMPASS(52)}
+        <div class="min-w-0">
+          <h1 class="fx-h whitespace-nowrap" style="font-size:clamp(2rem, 10.5vw, 3rem)">Flag Explorer</h1>
+          <p class="text-[.95rem] leading-snug mt-1.5" style="color:var(--band-gold)">Ten flags to a round. Name the country each one flies over.</p>
+        </div>
+      </div>
+      <form id="fx-setup" novalidate>
+        <h2 class="fx-h text-2xl">Who is exploring?</h2>
+        <div class="flex items-center gap-3 mt-3">
+          <span class="fx-ava" id="fx-me" style="--s:3.75rem" aria-hidden="true">${S.avatar}</span>
+          <div class="min-w-0 flex-1">
+            <label class="fx-label block" for="fx-name">Player name</label>
+            <input class="fx-input mt-1" id="fx-name" name="player" type="text" maxlength="14" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="next" placeholder="Your name" value="${esc(S.name)}" aria-describedby="fx-name-err">
+          </div>
+        </div>
+        <p class="text-sm text-madder mt-1 min-h-[1.25rem]" id="fx-name-err" role="alert"></p>
+        <div class="flex items-baseline justify-between gap-3 mt-2">
+          <p class="fx-label" id="fx-hand-label">Choose an avatar</p>
+          <button type="button" class="fx-quiet" style="padding:0" data-act="shuffle">Shuffle avatars</button>
+        </div>
+        <div class="grid grid-cols-4 gap-3 justify-items-center mt-3" id="fx-hand" role="group" aria-labelledby="fx-hand-label">${viewHand()}</div>
+        <button type="submit" class="fx-go mt-6">Continue</button>
+      </form>
+      <div class="flex flex-wrap justify-center gap-x-7 mt-3"><button type="button" class="fx-quiet" data-act="board">High scores</button>${textBtn()}</div>
+    </main>`;
+  }
+
+  // Screen 2: choose the game, see how points work, then into the round
+  function viewRules() {
+    const played = playedToday(P.name), daily = O.mode === 'daily', party = O.mode === 'party', clock = !daily && O.clock;
+    const seat = (g, i) => `<li class="fx-seat">
+        <button type="button" class="fx-ava" style="--s:2.6rem" data-act="guest-ava" data-i="${i}" aria-label="Change player ${i + 2}'s picture">${esc(g.avatar)}</button>
+        <input class="fx-input fx-guest" data-i="${i}" type="text" maxlength="14" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="done" placeholder="Player ${i + 2} name" aria-label="Player ${i + 2} name" value="${esc(g.name)}">
+        <button type="button" class="fx-quiet" data-act="guest-del" data-i="${i}" aria-label="Remove player ${i + 2}">Remove</button>
+      </li>`;
+    const players = !party ? '' : `<div class="mt-4">
+        <div class="flex items-baseline justify-between gap-3"><p class="fx-label">Players</p><p class="fx-label" style="text-transform:none;letter-spacing:.02em">Tap a face to change it</p></div>
+        <ul class="grid gap-2 mt-1.5">
+          <li class="fx-seat"><span class="fx-ava" style="--s:2.6rem" aria-hidden="true">${esc(P.avatar)}</span><span class="font-semibold text-lg fx-clip whitespace-nowrap min-w-0">${esc(P.name)}</span><span class="fx-label">Player 1</span></li>
+          ${O.guests.map(seat).join('')}
+        </ul>
+        ${O.guests.length < SEATS - 1 ? `<button type="button" class="fx-pick w-full mt-2" data-act="guest-add" aria-pressed="false">+ Add a player <span class="text-ink-soft font-normal">· up to ${SEATS}</span></button>` : ''}
+        <p class="text-sm text-madder mt-1 min-h-[1.25rem]" id="fx-party-err" role="alert"></p>
+      </div>`;
+    const pick = (k, v, label) => `<button type="button" class="fx-pick" data-act="opt" data-k="${k}" data-v="${v}" aria-pressed="${String(O[k]) === v}">${label}</button>`;
+    return `<main class="fx-sheet mx-auto max-w-xl">
+      ${playerHead()}
+      <h2 class="fx-h text-2xl">Choose your game</h2>
+      <div class="grid gap-2 mt-3">
+        <button type="button" class="fx-mode" data-act="opt" data-k="mode" data-v="daily" aria-pressed="${daily}">
+          <span class="flex items-baseline justify-between gap-3"><b>Today's challenge</b><span class="fx-label">${todayLabel()}</span></span>
+          <small>${played ? `You scored ${fmt(played.score)} today. Playing again is practice and is not recorded.` : 'The same ten flags for everyone today. Your first try is the one that counts.'}</small>
+        </button>
+        <button type="button" class="fx-mode" data-act="opt" data-k="mode" data-v="free" aria-pressed="${O.mode === 'free'}">
+          <span><b>Free play</b></span>
+          <small>Random flags, as many rounds as you like.</small>
+        </button>
+        <button type="button" class="fx-mode" data-act="opt" data-k="mode" data-v="party" aria-pressed="${party}">
+          <span><b>Pass and play</b></span>
+          <small>Two to eight players take turns on this device, one flag at a time.</small>
+        </button>
+      </div>
+      ${players}
+      ${daily ? '' : `<div class="grid gap-3 ${party ? '' : 'mt-4'}">
+        ${party ? `<div><p class="fx-label" id="fx-each-l">Length</p><div class="grid grid-cols-2 gap-2 mt-1" role="group" aria-labelledby="fx-each-l">${pick('each', '5', '5 flags each')}<button type="button" class="fx-pick" data-act="opt" data-k="each" data-v="${ROUND}" aria-pressed="${O.each === ROUND}" ${canLong() ? '' : 'disabled style="opacity:.45"'}>${ROUND} flags each</button></div>
+          ${canLong() ? '' : `<p class="text-sm text-ink-soft mt-1.5" id="fx-each-note">${O.guests.length + 1} players at ${ROUND} flags each need more flags than the well-known set holds. Choose Whole world for the longer game.</p>`}</div>` : ''}
+        <div><p class="fx-label" id="fx-pool-l">Flags</p><div class="grid grid-cols-2 gap-2 mt-1" role="group" aria-labelledby="fx-pool-l">${pick('pool', 'known', `Well-known · ${POOLS.known.codes.length}`)}${pick('pool', 'world', `Whole world · ${POOL.length}`)}</div></div>
+        <div><p class="fx-label" id="fx-clock-l">Clock</p><div class="grid grid-cols-2 gap-2 mt-1" role="group" aria-labelledby="fx-clock-l">${pick('clock', 'false', 'No clock')}${pick('clock', 'true', `${CLOCK} seconds a flag`)}</div></div>
+      </div>`}
+      <hr class="fx-rule my-6">
+      <h2 class="fx-h text-2xl">How points work</h2>
+      <table class="fx-ledger w-full mt-2 text-[.97rem]">
+        <tr><th scope="row">Name the flag with no help</th><td>${BASE}</td></tr>
+        <tr><th scope="row">Hint: reveal the continent</th><td class="text-madder">−${HINTS[0].cost}</td></tr>
+        <tr><th scope="row">Hint: show the capital city</th><td class="text-madder">−${HINTS[1].cost}</td></tr>
+        <tr><th scope="row">Hint: 50/50, strike out two wrong answers</th><td class="text-madder">−${HINTS[2].cost}</td></tr>
+        <tr><th scope="row"><span class="fx-star" aria-hidden="true">⭐</span> Bonus question, after a correct guess</th><td class="text-verdigris">+${BONUS}</td></tr>
+        <tr><th scope="row"><span class="fx-star" aria-hidden="true">⭐</span> Streak bonus, from ${STREAK[STREAK.length - 1][0]} flags in a row</th><td class="text-verdigris">+${STREAK[STREAK.length - 1][1]} to +${STREAK[0][1]}</td></tr>
+        ${clock ? `<tr><th scope="row">Speed bonus, for an answer within ${SPEED[0][0]} or ${SPEED[1][0]} seconds</th><td class="text-verdigris">+${SPEED[0][1]} or +${SPEED[1][1]}</td></tr>` : ''}
+        <tr><th scope="row">Final flag wager, win or lose what you risk</th><td>±${WAGERS.join(' or ')}</td></tr>
+      </table>
+      <p class="text-sm mt-3"><span class="fx-star" aria-hidden="true">⭐</span> Earned only on flags you name with no hints.</p>
+      <p class="text-ink-soft text-sm mt-2">Hint costs add up, but a correct answer always pays at least ${FLOOR}. Use even one hint and the bonus question stays locked for that flag.</p>
+      <p class="text-ink-soft text-sm mt-2">The streak counts flags named with no hints, one after another. A hint or a miss sends it back to zero. Its bonus grows to +${STREAK[1][1]} at ${STREAK[1][0]} in a row and +${STREAK[0][1]} at ${STREAK[0][0]}. Before the last flag you may risk points on it; a wagered flag allows no hints.${clock ? ` Run out of time and the flag counts as a miss.` : ''}</p>
+      <p class="fx-tip" style="margin-top:.9rem" id="fx-perfect-rule">${STAR} <b>Perfect round:</b> name all ${ROUND} flags and answer all ${ROUND} bonus questions in one round for a gold stamp in your passport and a gold star on the high scores. The final wager does not count either way.</p>
+      ${party ? `<p class="text-ink-soft text-sm mt-2">Pass and play: each turn is one flag, then the device goes to the next player. Everyone gets different flags of matching difficulty, and each player has their own hints, streak and final-flag wager. Games of ${ROUND} flags each also count for the high scores table.</p>` : ''}
+      <button class="fx-go mt-6" data-act="play" data-primary>Start playing</button>
+      <div class="flex flex-wrap justify-center gap-x-7 mt-3"><button class="fx-quiet" data-act="rules-back">Back</button><button class="fx-quiet" data-act="passport">Passport · ${stamps(P.name).length} of ${POOL.length}</button>${textBtn()}</div>
+    </main>`;
+  }
+
+  // The high-score tables: a ledger of ten lines per table, the newest entry marked
+  function viewBoard() {
+    const tab = S.tab, list = tableRows(tab), fromEnd = S.back === 'end' || S.back === 'match', party = fromEnd && S.party && M;
+    const mine = fromEnd && !party && S.entryT && tab === S.table ? list.findIndex(r => r.t === S.entryT) : -1;
+    const fresh = party && tab === S.table ? M.seats.map(seat => seat.S.entryT).filter(Boolean) : [];
+    const rows = ORD.map((o, i) => {
+      const r = list[i];
+      return `<li class="fx-hrow ${r ? '' : 'empty'} ${r && i === 0 ? 'top' : ''} ${i === mine || (r && fresh.includes(r.t)) ? 'hot' : ''}">
+        <span class="fx-hrank">${o}</span>
+        <span class="fx-ava ${r ? '' : 'blank'}" style="--s:2.1rem" aria-hidden="true">${r ? esc(r.avatar) : ''}</span>
+        <span class="flex items-center gap-2 min-w-0"><span class="fx-clip whitespace-nowrap min-w-0 ${r ? 'font-medium' : ''}">${r ? esc(r.name) : '· · ·'}</span>${r && r.perfect ? STAR : ''}${r && r.clock ? '<span class="fx-label flex-none">clock</span>' : ''}</span>
+        <span class="fx-num text-lg">${r ? fmt(r.score) : ''}</span>
+      </li>`;
+    }).join('');
+    const sub = tab === 'daily' ? `Today's challenge · ${todayLabel()}` : POOLS[tab].label;
+    const foot = mine >= 0 ? `${esc(P.name)} takes ${ORD[mine]} place.`
+      : list.length ? (tab === 'daily' ? 'A new challenge opens at midnight.' : 'Beat a score here to enter the table.')
+      : tab === 'daily' ? 'Nobody has played today yet.' : 'No scores yet. Finish a round to enter the table.';
+    const tabBtn = (v, label) => `<button type="button" class="fx-pick" data-act="tab" data-v="${v}" aria-pressed="${tab === v}">${label}</button>`;
+    return `<main class="fx-sheet mx-auto max-w-xl">
+      <div class="fx-band flex items-center gap-4">
+        ${COMPASS(52)}
+        <div class="min-w-0">
+          <h1 class="fx-h text-4xl">High scores</h1>
+          <p class="fx-label mt-1.5">${sub} · this device</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-2" role="group" aria-label="Which table">${tabBtn('world', 'Whole world')}${tabBtn('known', 'Well-known')}${tabBtn('daily', 'Today')}</div>
+      <div class="fx-hhead fx-label mt-5" aria-hidden="true"><span>Rank</span><span style="width:2.1rem"></span><span>Explorer</span><span>Score</span></div>
+      <ol>${rows}</ol>
+      <p class="font-script text-lg text-center mt-4">${foot}</p>
+      <p class="text-sm text-ink-soft text-center mt-2" id="fx-star-key">${STAR} marks a perfect round: all ${ROUND} flags and all ${ROUND} bonus questions.</p>
+      ${fromEnd && S.mode === 'free' && !S.party ? `<button class="fx-go mt-5" data-act="again" data-primary>Play again as ${esc(P.name)}</button>
+        <button class="fx-quiet block mx-auto mt-3" data-act="back">Back to results</button>`
+        : `<button class="fx-go mt-5" data-act="back" data-primary>${fromEnd ? 'Back to results' : 'Back'}</button>`}
+    </main>`;
+  }
+
+  /* ---------- The passport: a booklet. Cover, a page about its holder, then pages of stamps by continent ---------- */
+  const PER_PAGE = 12;                                   // stamps on one page: three across, four down
+  const INKS = ['a', 'b', 'c', 'd'];
+  const GOLD_PAGE = 4;                                   // gold stamps on one page: two across, two down
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function ppPages() {
+    const mine = stamps(P.name).filter(a => C[a]), pages = [{ type: 'cover' }, { type: 'id', total: mine.length }];
+    const gold = perfects(P.name), goldParts = Math.max(1, Math.ceil(gold.length / GOLD_PAGE));
+    for (let k = 0; k < goldParts; k++) pages.push({ type: 'gold', count: gold.length, list: gold.slice(k * GOLD_PAGE, (k + 1) * GOLD_PAGE), part: k + 1, parts: goldParts });
+    CONTS.forEach((name, ci) => {
+      const got = mine.filter(a => C[a].cont === ci), total = POOL.filter(a => C[a].cont === ci).length;   // kept in the order they were earned
+      const parts = Math.max(1, Math.ceil(got.length / PER_PAGE));
+      for (let k = 0; k < parts; k++) pages.push({ type: 'stamps', name, total, count: got.length, codes: got.slice(k * PER_PAGE, (k + 1) * PER_PAGE), part: k + 1, parts });
+    });
+    return pages;
+  }
+  const EMBLEM = `<svg class="pp-emblem" viewBox="0 0 120 120" aria-hidden="true">
+    <circle cx="60" cy="60" r="57" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    <circle cx="60" cy="60" r="50.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-dasharray=".1 7.83"/>
+    <circle cx="60" cy="60" r="44" fill="none" stroke="currentColor" stroke-width="1"/>
+    <g transform="translate(60 60) scale(1.78) translate(-24 -24)">
+      <path d="M24 24 34 14M24 24 34 34M24 24 14 34M24 24 14 14" stroke="currentColor" stroke-width="1.6" fill="none"/>
+      <path d="M24 2.5 27.6 20.4 45.5 24 27.6 27.6 24 45.5 20.4 27.6 2.5 24 20.4 20.4Z" fill="currentColor"/>
+      <path d="M24 2.5 24 24 20.4 20.4ZM45.5 24 24 24 27.6 20.4ZM24 45.5 24 24 27.6 27.6ZM2.5 24 24 24 20.4 27.6Z" fill="var(--pp-navy)"/>
+    </g>
+  </svg>`;
+  function ppPage(n) {
+    const pages = ppPages(), pg = pages[n];
+    if (pg.type === 'cover') return `<div class="pp-cover"><span class="pp-cover-t">Passport</span>${EMBLEM}<span class="pp-cover-b">Flag Explorer</span></div>`;
+    if (pg.type === 'id') {
+      const key = plain(P.name), no = 'FX' + String(hashStr(key) % 10000000).padStart(7, '0');
+      const mrzName = (key.toUpperCase().replace(/[^A-Z]/g, '<') + '<'.repeat(30)).slice(0, 27);
+      const conts = new Set(stamps(P.name).filter(a => C[a]).map(a => C[a].cont)).size;
+      const f = (label, value) => `<span class="pp-f">${label}</span><span class="pp-v">${value}</span>`;
+      return `<div class="pp-page">
+        <div class="pp-top"><span>Passport</span><span>Flag Explorer</span></div>
+        <div class="pp-id">
+          <div class="pp-photo" aria-hidden="true">${esc(P.avatar)}</div>
+          <div class="min-w-0">
+            <div class="grid grid-cols-2 gap-x-2">${`<div>${f('Type', 'P')}</div><div>${f('Passport no.', no)}</div>`}</div>
+            ${f('Name / Nom / Nombre', esc(P.name))}
+            ${f('Nationality / Nationalité', 'Explorer of the world')}
+            ${f('Flags stamped', `${pg.total} of ${POOL.length}`)}
+            ${f('Continents reached', `${conts} of ${CONTS.length}`)}
+          </div>
+        </div>
+        <p class="pp-f" style="margin-top:5%">Signature of bearer</p>
+        <p class="pp-sign" style="margin-top:0">${esc(P.name)}</p>
+        <div class="pp-mrz" aria-hidden="true">P&lt;FLG${mrzName}<br>${no}&lt;0FLG&lt;&lt;${String(pg.total).padStart(3, '0')}&lt;${POOL.length}&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</div>
+      </div>`;
+    }
+    if (pg.type === 'gold') {
+      const where = { world: 'Whole world', known: 'Well-known', daily: `Today's challenge` };
+      const seal = g => { const d = new Date(g.t); return `<div class="pp-gold" style="--r:${(hashStr('gold' + g.t) % 11) - 5}deg">
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8L10 14.9l-5.2 2.7 1-5.8L1.6 7.7l5.8-.8z" fill="currentColor"/></svg>
+          <b>Perfect round</b><span>${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}</span><span>${fmt(g.score)} points</span><span>${where[g.table] || ''}</span></div>`; };
+      return `<div class="pp-page">
+        <div class="pp-top"><span>Perfect rounds${pg.parts > 1 ? ` · ${pg.part} of ${pg.parts}` : ''}</span><span>${pg.count}</span></div>
+        ${pg.list.length ? `<div class="pp-golds">${pg.list.map(seal).join('')}</div>` : `<div class="pp-none">No perfect round yet. Name all ${ROUND} flags and all ${ROUND} bonus questions in one round to earn a gold stamp here.</div>`}
+        <div class="pp-foot"><span>Honours</span><span>${n - 1}</span></div>
+      </div>`;
+    }
+    const stamp = a => {
+      const h = hashStr(a + 'stamp'), name = C[a].name, shape = name.length > 13 ? 1 : h % 3;
+      return `<div class="pp-stamp s${shape}" style="--k:var(--pp-ink-${INKS[(h >>> 3) % 4]});--r:${((h >>> 6) % 15) - 7}deg"><img data-flag="${a}" alt=""><span>${esc(name)}</span></div>`;
+    };
+    return `<div class="pp-page">
+      <div class="pp-top"><span>${pg.name}${pg.parts > 1 ? ` · ${pg.part} of ${pg.parts}` : ''}</span><span>${pg.count} of ${pg.total}</span></div>
+      ${pg.codes.length ? `<div class="pp-grid">${pg.codes.map(stamp).join('')}</div>` : `<div class="pp-none">No stamps from ${pg.name} yet. Name one of its ${pg.total} flags to earn the first.</div>`}
+      <div class="pp-foot"><span>Visas</span><span>${n - 1}</span></div>
+    </div>`;
+  }
+  const ppNav = (n, len) => n === 0 ? `<span class="fx-label mx-auto py-2">Tap the passport to open it</span>`
+    : `<button class="fx-quiet whitespace-nowrap" data-act="pp-prev">${n === 1 ? 'Close' : 'Previous'}</button>
+      <span class="fx-label whitespace-nowrap">Page ${n} of ${len - 1}</span>
+      <button class="fx-quiet whitespace-nowrap" data-act="pp-next" ${n >= len - 1 ? 'disabled style="visibility:hidden"' : ''}>Next</button>`;
+  function viewPassport() {
+    const pages = ppPages(), total = pages[1].total;
+    S.pp = Math.min(S.pp || 0, pages.length - 1);
+    return `<main class="fx-sheet mx-auto max-w-xl">
+      <div class="fx-band flex items-end justify-between gap-3">
+        <div class="min-w-0"><p class="fx-label">Passport of</p><h1 class="fx-h text-3xl fx-clip whitespace-nowrap">${esc(P.name)}</h1></div>
+        <p class="fx-label flex-none text-right"><span class="fx-num">${total}</span><br>of ${POOL.length} stamped</p>
+      </div>
+      <div class="fx-meter" role="img" aria-label="${total} of ${POOL.length} flags stamped"><i style="width:${(100 * total / POOL.length).toFixed(1)}%"></i></div>
+      <div class="pp-stage mt-2"><div class="pp-book" id="pp-book" role="button" tabindex="0" data-act="pp-flip" aria-label="Passport. Tap the right side to turn the page, the left side to go back."><div class="pp-leaf">${ppPage(S.pp)}</div></div></div>
+      <div class="flex items-center justify-between gap-3" id="pp-nav">${ppNav(S.pp, pages.length)}</div>
+      <p class="text-ink-soft text-sm text-center mt-2">A flag is stamped the first time you name it correctly, in any recorded game.</p>
+      <button class="fx-go mt-5" data-act="back">Back</button>
+    </main>`;
+  }
+  // Turn to page n: the page being left swings away on its spine, or the earlier page swings back over.
+  let turning = false;
+  function turnTo(n) {
+    const book = app.querySelector('#pp-book'), len = ppPages().length, from = S.pp;
+    if (!book || turning || n === from || n < 0 || n >= len) return;
+    const cur = book.querySelector('.pp-leaf'), next = document.createElement('div');
+    next.className = 'pp-leaf'; next.innerHTML = ppPage(n);
+    S.pp = n; SFX.page();
+    app.querySelector('#pp-nav').innerHTML = ppNav(n, len);
+    const still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (still) { cur.replaceWith(next); return hydrate(book); }
+    turning = true;
+    let finished = false;      // each turn tidies up exactly once, whichever signal arrives first
+    const done = () => { if (finished) return; finished = true; turning = false; cur.remove(); next.classList.remove('in'); };
+    if (n > from) { book.insertBefore(next, cur); cur.classList.add('out'); cur.addEventListener('animationend', done, { once: true }); }
+    else { next.classList.add('in'); book.appendChild(next); next.addEventListener('animationend', done, { once: true }); }
+    setTimeout(done, 1000);   // in case the animation never reports back
+    hydrate(book);
+  }
+
+  function viewHead() {
+    const segs = S.round.map((_, i) => {
+      const e = S.log[i];
+      return `<i class="fx-seg ${e ? (e.ok ? 'ok' : 'miss') : i === S.i && S.screen === 'play' ? 'now' : ''}"></i>`;
+    }).join('');
+    const n = S.round.length, done = S.screen === 'end' ? n : S.i + 1;
+    return `<div class="fx-band">
+        <div class="flex items-baseline justify-between gap-3"><p class="fx-label fx-clip whitespace-nowrap min-w-0">${modeLabel()}${S.practice ? ' · practice' : ''}</p>${muteBtn()}</div>
+        <div class="flex items-center justify-between gap-3 mt-2">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <span class="fx-ava" style="--s:2.75rem" aria-hidden="true">${esc(P.avatar)}</span>
+            <p class="fx-word fx-clip min-w-0">${esc(P.name)}</p>
+          </div>
+          <dl class="flex gap-5 text-right">
+            <div><dt class="fx-label">Score</dt><dd class="fx-num mt-0.5">${fmt(S.score)}</dd></div>
+            <div><dt class="fx-label">Streak</dt><dd class="fx-num mt-0.5">${S.streak}</dd></div>
+          </dl>
+        </div>
+      </div>
+      <div class="fx-progress" role="img" aria-label="Flag ${done} of ${n}">
+        <span class="fx-label flex-none" style="font-weight:600">${S.screen === 'end' ? 'Round complete' : `Flag ${done} of ${n}`}</span>
+        <div class="fx-scale-bar" style="grid-template-columns:repeat(${n}, minmax(0, 1fr))">${segs}</div>
+      </div>`;
+  }
+
+  function viewPlate() {
+    const q = S.q, c = C[q.a2];
+    return `<figure class="fx-plate">
+      <div class="flex justify-between gap-3 fx-label"><span>Flag ${String(S.i + 1).padStart(2, '0')}</span><span id="fx-pos"></span></div>
+      ${S.clock ? `<div class="fx-clock" aria-hidden="true"><i id="fx-clock-bar"></i></div>` : ''}
+      <div class="fx-flagbox">
+        <img class="fx-flag" style="--ar:${c.ar}" data-flag="${q.a2}" alt="The flag to identify">
+        <div class="fx-seal">${COMPASS(56)}<span class="fx-label">Sealed until you decide</span></div>
+      </div>
+      <figcaption class="fx-caption" id="fx-cap"></figcaption>
+    </figure>
+    <div class="fx-perf" aria-hidden="true"></div>`;
+  }
+
+  function hintBtn(h) {
+    const q = S.q, c = C[q.a2], used = q.hints.includes(h.id), barred = !!q.wager;
+    const reveal = h.id === 'continent' ? contName(c) : h.id === 'capital' ? c.cap : 'Two struck out';
+    return `<button class="fx-hint ${used ? 'used' : ''}" data-act="hint" data-id="${h.id}" ${used || barred ? 'disabled' : ''} ${barred ? 'style="opacity:.45"' : ''}
+        aria-label="${used ? `${h.label} hint used: ${esc(reveal)}` : barred ? `${h.label} hint, not allowed on a wagered flag` : `${h.label} hint, costs ${h.cost} points`}">
+      <span class="fx-label">${h.label}</span>
+      ${used ? `<span class="fx-reveal">${esc(reveal)}</span>` : `<span class="fx-cost">−${h.cost} pts</span>`}
+    </button>`;
+  }
+
+  function optBtn(text, i, state, act) {
+    const mark = state === 'right' ? '✓' : state === 'wrong' ? '✕' : '';
+    return `<button class="fx-opt ${state}" data-act="${act}" data-i="${i}" ${state ? 'disabled' : ''}>
+      <span class="fx-key">${'ABCD'[i]}</span><span>${esc(text)}</span><span class="fx-mark" aria-hidden="true">${mark}</span>
+    </button>`;
+  }
+
+  const facts = c => `<p class="text-sm text-ink-soft mt-3 text-center">Capital <b class="text-ink font-semibold">${esc(c.cap)}</b> · ${esc(contName(c))} · about ${fmtPop(c.pop)} people</p>`;
+  function nextBtn() {
+    const last = S.i >= S.round.length - 1;
+    const label = !S.party ? (last ? 'See round results' : 'Next flag')
+      : last && M.seats.every(seat => seat.S === S || seat.S.done) ? 'See who won'
+      : `Pass to ${esc(M.seats[(M.turn + 1) % M.seats.length].P.name)}`;
+    return `<button class="fx-go mt-4" data-act="next" data-primary>${label}</button>`;
+  }
+
+  function viewPanel() {
+    const q = S.q, c = C[q.a2], e = S.log[S.log.length - 1];
+
+    if (q.phase === 'wager') {
+      const stake = (v, i) => {
+        const can = v <= S.score;
+        return `<button class="fx-opt ${can ? '' : 'out'}" style="${can ? '' : 'text-decoration:none;'}${v ? '' : 'grid-column:1 / -1'}" data-act="wager" data-v="${v}" ${can ? '' : 'disabled'}>
+          <span class="fx-key">${'ABCD'[i]}</span><span>${v ? `Risk ${v}` : 'No wager'}</span><span class="fx-mark" aria-hidden="true"></span></button>`;
+      };
+      return `<div class="mt-3 min-h-[5.6rem]">
+          <p class="fx-label text-ochre">Final flag wager</p>
+          <p class="font-script text-xl leading-tight mt-1">Risk some of your ${fmt(S.score)} points on the last flag?</p>
+          <p class="text-sm text-ink-soft mt-1.5">Name it and win the same amount on top. Miss and lose it. A wagered flag allows no hints.</p>
+        </div>
+        <div class="grid grid-cols-2 gap-2 mt-3">${[0, ...WAGERS].map(stake).join('')}</div>`;
+    }
+
+    if (q.phase === 'guess') {
+      const locked = q.hints.length > 0, ahead = locked ? 0 : streakBonus(S.streak + 1), tipOn = S.tip && S.i === 0 && !q.wager && !locked;
+      const status = q.wager ? `<p class="fx-pill gold">Risking ${q.wager} · no hints</p>`
+        : `<p class="fx-pill ${locked ? 'no' : 'ok'}">${locked ? 'Bonus locked' : 'Bonus in play'}</p>`;
+      return `<div class="flex items-center justify-between gap-3 mt-3">
+          <p class="fx-label flex items-baseline gap-2">Worth <span class="fx-num text-2xl leading-none">${flagWorth(q.hints)}</span>${ahead ? `<span class="text-verdigris" style="font-weight:600">+${ahead} streak</span>` : ''}</p>
+          ${status}
+        </div>
+        ${tipOn ? `<p class="fx-tip" id="fx-tip"><b>Tip:</b> stuck? A hint costs a few points and the bonus question, but beats a miss.</p>` : ''}
+        ${tipOn ? '' : `<p class="fx-label fx-hint-l"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.6 11.2C4.2 10.3 3.3 8.8 3.3 7.1a4.7 4.7 0 0 1 9.4 0c0 1.7-.9 3.2-2.3 4.1v1.1H5.6z"/><path d="M6.3 14.3h3.4"/></svg>${q.wager ? 'No hints on a wagered flag' : q.hints.length ? 'Hints used on this flag' : 'Need a hint? Tap one'}</p>`}
+        <div class="grid grid-cols-3 gap-2 mt-1.5" role="group" aria-label="Hints">${HINTS.map(hintBtn).join('')}</div>
+        <div class="grid grid-cols-2 gap-2 mt-3">${q.options.map((a, i) => optBtn(C[a].name, i, q.out.includes(a) ? 'out' : '', 'answer')).join('')}</div>`;
+    }
+
+    if (q.phase === 'result') {
+      const flagOpts = `<div class="grid grid-cols-2 gap-2 mt-3">${q.options.map((a, i) =>
+        optBtn(C[a].name, i, a === q.a2 ? 'right' : a === q.pick ? 'wrong' : q.out.includes(a) ? 'out' : 'dim', 'answer')).join('')}</div>`;
+      const gain = e.pts + e.streakPts + e.speedPts + e.wagerPts, bits = [];
+      let stamp, tail;
+      if (!e.ok) {
+        stamp = `<span class="fx-stamp no">${e.timedOut ? 'Time up' : 'Missed'}<br>${signed(gain)}</span>`;
+        bits.push(`This is the flag of <b>${esc(the(c))}</b>.`);
+        bits.push(e.wagerPts ? `The wager costs you ${fmt(-e.wagerPts)}, and the streak goes back to zero.` : 'No points, and the streak goes back to zero.');
+        tail = facts(c) + nextBtn();
+      } else {
+        stamp = `<span class="fx-stamp ok">Correct<br>${signed(gain)}</span>`;
+        if (e.cost) bits.push(`${BASE} less ${e.cost} for ${e.hints.length === 1 ? 'the hint' : e.hints.length + ' hints'}.`);
+        if (e.streakPts) bits.push(`${e.streak} in a row: +${e.streakPts}.`);
+        else if (e.runLost) bits.push(`The hint ends your streak of ${e.runLost}.`);
+        if (e.speedPts) bits.push(`Quick answer: +${e.speedPts}.`);
+        if (e.wagerPts) bits.push(`Wager won: +${e.wagerPts}.`);
+        if (e.bonus === 'locked') { bits.push('The bonus question is locked for this flag because a hint was used.'); tail = facts(c) + nextBtn(); }
+        else { bits.push('No hints, so the bonus question is unlocked.'); tail = `<button class="fx-go mt-4" data-act="bonus" data-primary>Bonus question · +${BONUS}</button>`; }
+      }
+      return `<div class="flex items-center gap-4 mt-3 min-h-[5.6rem]" role="status">${stamp}<p class="text-[.97rem] leading-snug min-w-0">${bits.join(' ')}</p></div>${flagOpts}${tail}`;
+    }
+
+    const b = q.bonus;
+    if (q.phase === 'bonus') {
+      return `<div class="mt-3 min-h-[5.6rem]">
+          <p class="fx-label text-ochre">Bonus question · ${b.label} · worth <span class="fx-num" style="color:inherit">${BONUS}</span></p>
+          <p class="font-script text-xl leading-tight mt-1">${esc(b.prompt)}</p>
+        </div>
+        <div class="grid grid-cols-2 gap-2 mt-3">${b.options.map((t, i) => optBtn(t, i, '', 'bonus-answer')).join('')}</div>`;
+    }
+
+    // bonusResult
+    const won = e.bonus === 'won';
+    return `<div class="flex items-center gap-4 mt-3 min-h-[5.6rem]" role="status">
+        <span class="fx-stamp ${won ? 'bonus' : 'no'}">Bonus<br>${won ? '+' + BONUS : '0'}</span>
+        <p class="text-[.97rem] leading-snug min-w-0">${won ? `Right. That makes <b>${fmt(entryTotal(e))}</b> for this flag.` : `The answer was <b>${esc(b.options[b.answer])}</b>. You keep the ${fmt(entryTotal(e))} for the flag.`}</p>
+      </div>
+      <div class="grid grid-cols-2 gap-2 mt-3">${b.options.map((t, i) => optBtn(t, i, i === b.answer ? 'right' : i === b.pick ? 'wrong' : 'dim', 'bonus-answer')).join('')}</div>
+      ${facts(c)}${nextBtn()}`;
+  }
+
+  function entryNote(e) {
+    const wager = e.wagerPts ? (e.wagerPts > 0 ? ' · wager won' : ' · wager lost') : '';
+    if (!e.ok) return (e.timedOut ? 'Out of time' : 'Missed') + wager;
+    if (e.bonus === 'locked') return `${plural(e.hints.length, 'hint')} · bonus locked` + wager;
+    return 'No hints · ' + (e.bonus === 'won' ? 'bonus won' : e.bonus === 'lost' ? 'bonus missed' : 'bonus open') + wager;
+  }
+
+  const logRows = log => log.map((e, i) => `<li class="flex items-center gap-3 py-1.5 ${i ? 'border-t border-dotted border-rule' : ''}">
+        <span class="fx-label w-6 flex-none">${String(i + 1).padStart(2, '0')}</span>
+        <img class="fx-thumb" data-flag="${e.a2}" alt="">
+        <span class="min-w-0 flex-1 leading-tight"><span class="block font-medium ${e.ok ? '' : 'text-madder'}">${esc(C[e.a2].name)}</span><span class="block text-xs text-ink-soft">${entryNote(e)}</span></span>
+        <span class="fx-num ${entryTotal(e) < 0 ? 'text-madder' : ''}" ${entryTotal(e) < 0 ? 'style="color:var(--madder)"' : ''}>${entryTotal(e) < 0 ? signed(entryTotal(e)) : fmt(entryTotal(e))}</span>
+      </li>`).join('');
+  // Everyone in a pass-and-play game, leader first. `mark` is the seat to pick out: whoever is playing, or about to.
+  const unplayed = () => M.seats.every(seat => !seat.S.log.length);
+  const standingRows = mark => (unplayed() ? M.seats.map((seat, k) => ({ k, P: seat.P, S: seat.S, place: (k - M.first + M.seats.length) % M.seats.length + 1 })).sort((a, b) => a.place - b.place) : standings())
+    .map(r => `<li class="fx-hrow ${r.k === mark ? 'hot' : ''} ${r.place === 1 && r.S.score > 0 ? 'top' : ''}">
+        <span class="fx-hrank">${ORD[r.place - 1]}</span>
+        <span class="fx-ava" style="--s:2.1rem" aria-hidden="true">${esc(r.P.avatar)}</span>
+        <span class="min-w-0 leading-tight"><span class="block fx-clip whitespace-nowrap font-medium">${esc(r.P.name)}</span><span class="block text-xs text-ink-soft">${r.S.log.length} of ${r.S.round.length} played</span></span>
+        <span class="fx-num text-lg">${fmt(r.S.score)}</span>
+      </li>`).join('');
+
+  const endEarlyBtn = () => `<button class="fx-quiet" data-act="end-early">${S.confirmEnd ? `Tap again to end this ${S.party ? 'game' : 'round'} now` : `End ${S.party ? 'game' : 'round'} early`}</button>`;
+
+  function viewLog() {
+    const t = totals(S.log), best = bestFor(S.table, P.name);
+    const line = (label, v, tone) => `<tr><th scope="row">${label}</th><td class="${v ? tone : ''}">${v ? signed(v) : '0'}</td></tr>`;
+    const rows = logRows(S.log);
+    const table = !S.party ? '' : `<h3 class="fx-label mt-5">${unplayed() ? 'Order of play' : 'Standings'}</h3><ol class="mt-1">${standingRows(M.turn)}</ol>`;
+    return `<div class="flex items-baseline justify-between gap-3"><h2 class="fx-h text-2xl">Travel log</h2><span class="fx-label fx-clip whitespace-nowrap min-w-0">${esc(P.name)}</span></div>
+      <dl class="grid grid-cols-3 gap-2 mt-3 text-center">
+        <div class="fx-tile"><dt class="fx-label">Score</dt><dd class="fx-num text-2xl leading-tight">${fmt(S.score)}</dd></div>
+        <div class="fx-tile"><dt class="fx-label">Streak</dt><dd class="fx-num text-2xl leading-tight">${S.streak}</dd></div>
+        <div class="fx-tile"><dt class="fx-label">Longest</dt><dd class="fx-num text-2xl leading-tight">${S.topStreak}</dd></div>
+      </dl>
+      ${table}
+      <h3 class="fx-label mt-5">Points breakdown</h3>
+      <table class="fx-ledger w-full text-[.95rem]">
+        <tr><th scope="row">Flags named <span class="text-ink-soft">(${t.named} × ${BASE})</span></th><td>${fmt(t.base)}</td></tr>
+        ${line('Hint costs', -t.cost, 'text-madder')}
+        ${line(`Bonus questions <span class="text-ink-soft">(${t.bonusWon} × ${BONUS})</span>`, t.bonus, 'text-verdigris')}
+        ${line('Streak bonus', t.streak, 'text-verdigris')}
+        ${S.clock ? line('Speed bonus', t.speed, 'text-verdigris') : ''}
+        ${t.wager ? line('Final flag wager', t.wager, t.wager > 0 ? 'text-verdigris' : 'text-madder') : ''}
+        <tr class="total"><th scope="row">Total</th><td>${fmt(S.score)}</td></tr>
+      </table>
+      <h3 class="fx-label mt-5">Flags this round</h3>
+      ${rows ? `<ol class="mt-1">${rows}</ol>` : `<p class="text-sm text-ink-soft italic mt-1">Each flag you answer is entered here with its points.</p>`}
+      ${best.score ? `<p class="fx-label mt-4">Your best here <span class="fx-num">${fmt(best.score)}</span> · Longest streak <span class="fx-num">${best.streak}</span></p>` : ''}
+      ${S.screen === 'play' ? `<div class="flex flex-wrap justify-between gap-x-7 mt-2">${endEarlyBtn()}${textBtn()}</div>` : ''}`;
+  }
+
+  // What a player pastes into the family chat after today's challenge.
+  function shareText() {
+    const t = totals(S.log);
+    const grid = S.round.map((_, i) => { const e = S.log[i]; return !e ? '⬜' : !e.ok ? '🟥' : e.hints.length ? '🟨' : '🟩'; }).join('');
+    return `Flag Explorer · ${todayLabel()}\n${P.avatar} ${P.name} scored ${fmt(S.score)}\n${grid}\nBonus questions ${t.bonusWon} of ${S.round.length} · best streak ${S.topStreak}${S.perfect ? '\n⭐ Perfect round' : ''}`;
+  }
+
+  function viewEnd() {
+    const t = totals(S.log), lockedN = S.log.filter(e => e.bonus === 'locked').length, daily = S.mode === 'daily', have = stamps(P.name).length;
+    const summary = S.perfect ? 'Every flag and every bonus question right. A gold stamp is in your passport, and a gold star marks this score.'
+      : t.named === S.round.length && !t.cost ? 'Every flag named without a single hint.'
+      : t.cost ? `Hints cost you ${fmt(t.cost)} points and locked ${plural(lockedN, 'bonus question')}.` : 'Not one hint used all round.';
+    return `<div class="lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-7 lg:items-start">
+      <main class="fx-sheet">
+        <div id="fx-head">${viewHead()}</div>
+        <hr class="fx-rule my-5">
+        ${S.perfect ? `<p class="fx-label">${ROUND} flags · ${ROUND} bonus questions · no hints</p>
+        <h1 class="fx-perfect mt-2" id="fx-perfect"><svg viewBox="0 0 20 20" width=".62em" height=".62em" aria-hidden="true"><path d="M10 1.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8L10 14.9l-5.2 2.7 1-5.8L1.6 7.7l5.8-.8z" fill="currentColor"/></svg> Perfect round <svg viewBox="0 0 20 20" width=".62em" height=".62em" aria-hidden="true"><path d="M10 1.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8L10 14.9l-5.2 2.7 1-5.8L1.6 7.7l5.8-.8z" fill="currentColor"/></svg></h1>
+        <p class="font-script text-lg mt-3">${rankFor(S.score)} · earned by ${esc(P.name)}</p>`
+        : `<p class="fx-label">${t.named} of ${S.log.length} flags named</p>
+        <h1 class="fx-h text-4xl sm:text-5xl mt-1">${rankFor(S.score)}</h1>
+        <p class="font-script text-lg mt-1">the rank earned by ${esc(P.name)}</p>`}
+        <p class="mt-3 flex items-baseline gap-2"><span class="fx-num text-5xl leading-none">${fmt(S.score)}</span><span class="fx-label">points</span></p>
+        ${S.place ? `<p class="mt-5"><span class="fx-stamp bonus">${daily ? `Today's table` : 'High score'}<br>${ORD[S.place - 1]} place</span></p>` : ''}
+        ${S.newBest ? `<p class="fx-label mt-4" style="color:var(--ochre)">New personal best</p>` : ''}
+        ${S.practice ? `<p class="fx-label mt-4">Practice replay: not recorded</p>` : ''}
+        <p class="font-script text-lg mt-4">${summary}</p>
+        ${S.newStamps ? `<p class="text-sm mt-2"><b class="font-semibold">${plural(S.newStamps, 'new passport stamp')}.</b> <span class="text-ink-soft">${have} of ${POOL.length} collected.</span></p>` : ''}
+        ${daily && !S.practice ? `<h2 class="fx-label mt-6">Share today's result</h2>
+          <pre class="fx-share mt-1" id="fx-share">${esc(shareText())}</pre>
+          <button class="fx-go mt-3" data-act="copy" data-primary>Copy result</button>
+          <button class="fx-quiet block mx-auto mt-3" data-act="choose">Choose another game</button>`
+          : daily ? `<button class="fx-go mt-6" data-act="choose" data-primary>Choose another game</button>`
+          : `<button class="fx-go mt-6" data-act="again" data-primary>Play again as ${esc(P.name)}</button>
+          <button class="fx-quiet block mx-auto mt-3" data-act="choose">Choose another game</button>`}
+        <div class="flex flex-wrap justify-center gap-x-7 mt-1"><button class="fx-quiet" data-act="board">High scores</button><button class="fx-quiet" data-act="passport">Passport</button><button class="fx-quiet" data-act="change-player">Change player</button></div>
+      </main>
+      <aside class="fx-sheet mt-5 lg:mt-0" id="fx-log">${viewLog()}</aside>
+    </div>`;
+  }
+
+  // Between turns: who is next, and where everyone stands. The flag stays hidden until the next player says so.
+  function viewPass() {
+    const n = S.round.length, opening = M.seats.every(seat => !seat.S.log.length), last = S.i === n - 1;
+    return `<main class="fx-sheet mx-auto max-w-xl">
+      <div class="fx-band">
+        <div class="flex items-baseline justify-between gap-3"><p class="fx-label fx-clip whitespace-nowrap min-w-0">${modeLabel()}</p>${muteBtn()}</div>
+        <h1 class="fx-h text-4xl mt-2">${opening ? 'First to play' : 'Pass it on'}</h1>
+      </div>
+      <div class="text-center pt-2">
+        <span class="fx-ava" style="--s:5.5rem" aria-hidden="true">${esc(P.avatar)}</span>
+        <p class="fx-label mt-4">${opening ? 'Hand the device to' : 'Next up'}</p>
+        <h2 class="fx-h text-4xl mt-1 fx-clip" id="fx-pass-name">${esc(P.name)}</h2>
+        <p class="text-ink-soft mt-1.5">Flag ${S.i + 1} of ${n}${last ? ' · the final flag' : ''}</p>
+      </div>
+      <button class="fx-go mt-5" data-act="ready" data-primary>I'm ready · show my flag</button>
+      <h3 class="fx-label mt-6">${opening ? 'Order of play' : 'Standings'}</h3>
+      <ol class="mt-1">${standingRows(M.turn)}</ol>
+      <div class="flex flex-wrap justify-between gap-x-7 mt-3">${endEarlyBtn()}${textBtn()}</div>
+    </main>`;
+  }
+
+  function viewMatch() {
+    const rank = standings(), top = rank[0].S.score, winners = rank.filter(r => r.place === 1), each = M.each;
+    const title = top <= 0 ? 'No winner this time' : winners.length > 1 ? 'A tie at the top' : `${esc(winners[0].P.name)} wins`;
+    const sub = top <= 0 ? 'Nobody scored. Try a rematch.' : winners.length > 1 ? `${listOf(winners.map(r => esc(r.P.name)))} finish level on ${fmt(top)}.`
+      : rank.length > 1 && rank[1].S.score > 0 ? `by ${fmt(top - rank[1].S.score)} over ${esc(rank[1].P.name)}` : 'the only player to score';
+    const rows = rank.map(r => {
+      const t = totals(r.S.log);
+      return `<li class="fx-hrow ${r.place === 1 && top > 0 ? 'top hot' : ''}">
+        <span class="fx-hrank">${ORD[r.place - 1]}</span>
+        <span class="fx-ava" style="--s:2.4rem" aria-hidden="true">${esc(r.P.avatar)}</span>
+        <span class="min-w-0 leading-tight"><span class="flex items-center gap-1.5 min-w-0"><span class="fx-clip whitespace-nowrap font-medium min-w-0">${esc(r.P.name)}</span>${r.S.perfect ? STAR : ''}</span><span class="block text-xs text-ink-soft">${t.named} of ${r.S.round.length} named · best streak ${r.S.topStreak}</span></span>
+        <span class="fx-num text-xl">${fmt(r.S.score)}</span>
+      </li>`;
+    }).join('');
+    const placed = rank.filter(r => r.S.place), stamped = rank.filter(r => r.S.newStamps), flawless = rank.filter(r => r.S.perfect);
+    const folds = rank.map((r, i) => `<details class="fx-fold" ${i ? '' : 'open'}>
+        <summary><span class="fx-ava" style="--s:1.9rem" aria-hidden="true">${esc(r.P.avatar)}</span><span class="fx-clip whitespace-nowrap min-w-0 font-medium">${esc(r.P.name)}</span><span class="fx-num">${fmt(r.S.score)}</span></summary>
+        ${r.S.log.length ? `<ol class="pb-2">${logRows(r.S.log)}</ol>` : `<p class="text-sm text-ink-soft pb-2">No flags played.</p>`}
+      </details>`).join('');
+    return `<div class="lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-7 lg:items-start">
+      <main class="fx-sheet">
+        <div class="fx-band">
+          <div class="flex items-baseline justify-between gap-3"><p class="fx-label fx-clip whitespace-nowrap min-w-0">Pass and play · ${each} flags each</p>${muteBtn()}</div>
+          <div class="flex items-center gap-3.5 mt-2">
+            ${top > 0 && winners.length === 1 ? `<span class="fx-ava" style="--s:3.5rem" aria-hidden="true">${esc(winners[0].P.avatar)}</span>` : ''}
+            <div class="min-w-0"><h1 class="fx-h text-4xl" id="fx-winner" style="overflow-wrap:anywhere">${title}</h1><p class="text-[.95rem] leading-snug mt-1" style="color:var(--band-gold);overflow-wrap:anywhere">${sub}</p></div>
+          </div>
+        </div>
+        <div class="fx-hhead fx-label" aria-hidden="true"><span>Place</span><span style="width:2.4rem"></span><span>Explorer</span><span>Score</span></div>
+        <ol id="fx-final">${rows}</ol>
+        ${flawless.length ? `<p class="text-sm mt-4" id="fx-flawless">${STAR} <b class="font-semibold">Perfect round:</b> ${listOf(flawless.map(r => esc(r.P.name)))}. A gold stamp is in ${flawless.length > 1 ? 'each passport' : 'the passport'}.</p>` : ''}
+        ${placed.length ? `<p class="text-sm ${flawless.length ? 'mt-2' : 'mt-4'}"><b class="font-semibold">High scores:</b> ${placed.map(r => `${esc(r.P.name)} ${ORD[r.S.place - 1]}`).join(', ')}.</p>` : ''}
+        ${stamped.length ? `<p class="text-sm mt-2"><b class="font-semibold">New passport stamps:</b> ${stamped.map(r => `${esc(r.P.name)} ${r.S.newStamps}`).join(', ')}.</p>` : ''}
+        ${each === ROUND ? '' : `<p class="text-sm text-ink-soft mt-2">Games of ${each} flags each stay off the high scores table.</p>`}
+        <button class="fx-go mt-6" data-act="rematch" data-primary>Play again</button>
+        <button class="fx-quiet block mx-auto mt-3" data-act="choose">Choose another game</button>
+        <div class="flex flex-wrap justify-center gap-x-7 mt-1"><button class="fx-quiet" data-act="board">High scores</button><button class="fx-quiet" data-act="change-player">Change player</button></div>
+      </main>
+      <aside class="fx-sheet mt-5 lg:mt-0" id="fx-log">
+        <h2 class="fx-h text-2xl">Travel log</h2>
+        <div class="mt-2">${folds}</div>
+      </aside>
+    </div>`;
+  }
+
+  /* ---------- Rendering ---------- */
+  const app = document.getElementById('app');
+  const hydrate = root => root.querySelectorAll('img[data-flag]').forEach(img => { if (!img.src) img.src = flagURL(img.dataset.flag); });
+
+  // The clock for timed rounds. It reads the real time on every tick, so a sleeping tab cannot stretch it.
+  let clockId = null, lastSecs = -1;
+  function clockStop() { if (clockId) { clearInterval(clockId); clockId = null; } }
+  function clockTick() {
+    const q = S.q;
+    if (S.screen !== 'play' || !q || q.phase !== 'guess') return clockStop();
+    const left = CLOCK - (Date.now() - q.t0) / 1000, secs = Math.max(0, Math.ceil(left));
+    const bar = app.querySelector('#fx-clock-bar'), pos = app.querySelector('#fx-pos');
+    if (bar) { bar.style.transform = `scaleX(${Math.max(0, left / CLOCK)})`; bar.parentNode.classList.toggle('low', left <= 5); }
+    if (pos) pos.textContent = secs + ' s';
+    if (secs !== lastSecs) { lastSecs = secs; if (secs <= 5 && secs > 0) SFX.tick(); }
+    if (left <= 0) { clockStop(); answer(null); render(true); }
+  }
+
+  // A long word in an answer steps down a size until it fits on its line, so no name is ever split mid-word.
+  function fitOpts() {
+    for (const lab of app.querySelectorAll('.fx-opt > span:nth-child(2)')) {
+      lab.style.fontSize = ''; lab.style.overflowWrap = 'normal';
+      for (const size of ['.94rem', '.88rem', '.82rem', '.76rem']) {
+        if (lab.scrollWidth <= lab.clientWidth) break;
+        lab.style.fontSize = size;
+      }
+      lab.style.overflowWrap = '';
+    }
+  }
+  addEventListener('resize', fitOpts);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitOpts);
+
+  function render(focus) {
+    if (S.screen !== 'play') {
+      clockStop();
+      app.innerHTML = ({ start: viewStart, rules: viewRules, board: viewBoard, passport: viewPassport, end: viewEnd, pass: viewPass, match: viewMatch })[S.screen]();
+    } else {
+      if (!app.querySelector('#fx-panel')) {
+        app.innerHTML = `<div class="lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-7 lg:items-start">
+          <main class="fx-sheet"><div id="fx-head"></div><div id="fx-plate"></div><div id="fx-panel"></div></main>
+          <aside class="fx-sheet mt-5 lg:mt-0" id="fx-log"></aside>
+        </div>`;
+      }
+      const q = S.q, c = C[q.a2], plate = app.querySelector('#fx-plate');
+      app.querySelector('#fx-head').innerHTML = viewHead();
+      // The plate is only rebuilt when the flag changes, so the image never flickers mid-question.
+      if (plate.dataset.key !== S.i + q.a2) { plate.innerHTML = viewPlate(); plate.dataset.key = S.i + q.a2; }
+      const sealed = q.phase === 'wager', revealed = !sealed && q.phase !== 'guess', cap = app.querySelector('#fx-cap');
+      plate.firstElementChild.classList.toggle('sealed', sealed);
+      cap.textContent = sealed ? 'The final flag' : revealed ? c.name : 'Which country flies this flag?';
+      cap.classList.toggle('named', revealed);
+      app.querySelector('#fx-pos').textContent = revealed ? coords(c) : sealed ? 'Final flag' : 'Destination unknown';
+      app.querySelector('#fx-panel').innerHTML = viewPanel();
+      app.querySelector('#fx-log').innerHTML = viewLog();
+      if (S.clock && q.phase === 'guess') { if (!clockId) { lastSecs = -1; clockId = setInterval(clockTick, 100); } clockTick(); } else clockStop();
+    }
+    hydrate(app);
+    fitOpts();
+    saveLive();
+    if (focus) {
+      const btn = app.querySelector('[data-primary]');
+      if (btn) { btn.focus({ preventScroll: true }); btn.scrollIntoView({ block: 'nearest' }); }
+    }
+  }
+  const go = () => { render(false); window.scrollTo(0, 0); };
+
+  // Start screen: these update in place so the name box keeps its text and focus.
+  function setAvatar(e) {
+    S.avatar = e;
+    app.querySelector('#fx-me').textContent = e;
+    app.querySelectorAll('#fx-hand .fx-ava').forEach(b => b.setAttribute('aria-pressed', b.dataset.e === e));
+  }
+  app.addEventListener('input', ev => {
+    if (ev.target.classList.contains('fx-guest')) {      // pass-and-play names update in place, so the box keeps its focus
+      O.guests[+ev.target.dataset.i].name = ev.target.value;
+      app.querySelector('#fx-party-err').textContent = '';
+      return;
+    }
+    if (ev.target.id !== 'fx-name') return;
+    S.name = ev.target.value;
+    app.querySelector('#fx-name-err').textContent = '';
+  });
+  app.addEventListener('submit', ev => {
+    ev.preventDefault();
+    if (ev.target.id !== 'fx-setup') return;
+    const name = cleanName(S.name);
+    if (!name) {
+      app.querySelector('#fx-name-err').textContent = 'Enter a player name to start.';
+      app.querySelector('#fx-name').focus();
+      return;
+    }
+    choosePlayer(name, S.avatar);
+    S.name = name; openRules(); go();
+  });
+
+  function copyResult(btn) {
+    const text = shareText();
+    const select = () => {      // some app views refuse the clipboard: select the text so it can be copied by hand
+      const r = document.createRange(), sel = window.getSelection();
+      r.selectNodeContents(app.querySelector('#fx-share')); sel.removeAllRanges(); sel.addRange(r);
+      btn.textContent = 'Selected: now copy it';
+    };
+    try { navigator.clipboard.writeText(text).then(() => { btn.textContent = 'Copied'; }, select); } catch (e) { select(); }
+  }
+
+  app.addEventListener('click', ev => {
+    const el = ev.target.closest('[data-act]');
+    if (!el || el.disabled) return;
+    const act = el.dataset.act;
+    if (act === 'avatar') return setAvatar(el.dataset.e);
+    if (act === 'shuffle') { S.hand = dealHand(); app.querySelector('#fx-hand').innerHTML = viewHand(); return; }
+    if (act === 'copy') return copyResult(el);
+    if (act === 'text') { bigText = !bigText; store.set('fx-text', bigText); applyText(); SFX.tap(); return render(false); }
+    if (act === 'mute') { muted = !muted; store.set('fx-mute', muted); if (muted) hush(); else { wake(); SFX.right(); } return render(false); }
+    if (act === 'opt') {
+      const k = el.dataset.k, v = el.dataset.v;
+      O[k] = k === 'clock' ? v === 'true' : k === 'each' ? +v : v;
+      if (O.mode === 'party' && !O.guests.length) O.guests.push({ name: '', avatar: spareAvatar() });
+      tidyParty(); savePrefs(); SFX.tap(); return render(false);
+    }
+    if (act === 'guest-add') { if (O.guests.length < SEATS - 1) O.guests.push({ name: '', avatar: spareAvatar() }); tidyParty(); render(false); const boxes = app.querySelectorAll('.fx-guest'); boxes[boxes.length - 1].focus(); return; }
+    if (act === 'guest-del') { O.guests.splice(+el.dataset.i, 1); tidyParty(); return render(false); }
+    if (act === 'guest-ava') { O.guests[+el.dataset.i].avatar = spareAvatar(); SFX.tap(); return render(false); }
+    if (act === 'tab') { S.tab = el.dataset.v; return render(false); }
+    if (act === 'rules-back') { S.screen = 'start'; return go(); }
+    if (act === 'choose') { const party = !!M; openRules(); if (party) O.mode = 'party'; return go(); }
+    if (act === 'board') { S.back = S.screen; S.screen = 'board'; S.tab = S.back === 'end' || S.back === 'match' ? S.table : S.tab || O.pool; return go(); }
+    if (act === 'passport') { S.back = S.screen; S.screen = 'passport'; S.pp = 0; turning = false; return go(); }
+    if (act === 'pp-next') return turnTo(S.pp + 1);
+    if (act === 'pp-prev') return turnTo(S.pp - 1);
+    if (act === 'pp-flip') { const r = el.getBoundingClientRect(); return turnTo(S.pp + (S.pp > 0 && ev.clientX - r.left < r.width * .3 ? -1 : 1)); }
+    if (act === 'back') { S.screen = S.back || 'start'; return go(); }
+    if (act === 'change-player') { startScreen(true); go(); app.querySelector('#fx-name').focus(); return; }
+    let focus = true, top = false;
+    if (act !== 'end-early') S.confirmEnd = false;
+    if (act === 'play' && O.mode === 'party') {
+      const err = partyError();
+      if (err) { app.querySelector('#fx-party-err').textContent = err; const box = [...app.querySelectorAll('.fx-guest')].find(b => !cleanName(b.value)); if (box) box.focus(); return; }
+      SFX.tap(); startMatch(0); top = true;
+    }
+    else if (act === 'again' || act === 'play') { if (act === 'again') O.mode = 'free'; SFX.tap(); newRound(); top = true; }
+    else if (act === 'rematch') { const first = M.first + 1; P = M.seats[0].P; SFX.tap(); startMatch(first); top = true; }
+    else if (act === 'ready') { SFX.tap(); S.screen = 'play'; startQuestion(); top = true; }
+    else if (act === 'wager') { setWager(+el.dataset.v); SFX.tap(); focus = false; }
+    else if (act === 'hint') { useHint(el.dataset.id); focus = false; }
+    else if (act === 'answer') answer(S.q.options[+el.dataset.i]);
+    else if (act === 'bonus') { S.q.phase = 'bonus'; focus = false; }
+    else if (act === 'bonus-answer') answerBonus(+el.dataset.i);
+    else if (act === 'next') { next(); top = true; }
+    else if (act === 'end-early') { if (S.confirmEnd) { if (S.party) endMatch(); else finish(); top = true; } else { S.confirmEnd = true; focus = false; } }
+    render(focus && !top);
+    if (top) window.scrollTo(0, 0);
+  });
+
+  // Keyboard: A-D or 1-4 answer the question on screen.
+  document.addEventListener('keydown', ev => {
+    if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+    if (S.screen === 'passport') {      // arrow keys turn the pages; Enter or Space on the booklet opens it
+      if (ev.key === 'ArrowRight' || ((ev.key === 'Enter' || ev.key === ' ') && ev.target.id === 'pp-book')) { ev.preventDefault(); turnTo(S.pp + 1); }
+      else if (ev.key === 'ArrowLeft') turnTo(S.pp - 1);
+      return;
+    }
+    if (S.screen !== 'play') return;
+    const i = 'abcd'.indexOf(ev.key.toLowerCase()) >= 0 ? 'abcd'.indexOf(ev.key.toLowerCase()) : '1234'.indexOf(ev.key);
+    if (i < 0) return;
+    const btn = app.querySelectorAll('#fx-panel .fx-opt')[i];
+    if (btn && !btn.disabled) btn.click();
+  });
+
+  // A game in progress is kept on the device, so closing the app, a reload or an update picks up where it left off.
+  function saveLive() {
+    if (S.screen === 'start' || S.screen === 'rules') return store.set('fx-live', null);
+    if (['play', 'pass', 'end', 'match'].includes(S.screen)) store.set('fx-live', { S, P, M, day: todayKey(), t: Date.now() });
+  }
+  function liveSaved() {
+    const v = store.get('fx-live', null);
+    if (!v || !v.S || !v.t) return null;
+    const age = Date.now() - v.t, over = v.S.screen === 'end' || v.S.screen === 'match';
+    if (age < 0 || age > (over ? 30 * 60e3 : 24 * 3600e3)) return null;      // results linger for half an hour, an unfinished game for a day
+    if (v.S.mode === 'daily' && v.day !== todayKey()) return null;           // yesterday's challenge cannot be finished today
+    return v;
+  }
+  function boot(saved) {
+    const s = saved && saved.S, live = s && Array.isArray(s.round) && s.round.every(r => r && C[r.a2] && r.bonus) && (s.screen === 'play' || s.screen === 'end');
+    const m = saved && saved.M, okRound = x => x && Array.isArray(x.round) && x.round.every(r => r && C[r.a2] && r.bonus);
+    if (m && Array.isArray(m.seats) && m.seats.length > 1 && m.seats.every(seat => seat && seat.P && okRound(seat.S)) && m.seats[m.turn]) {
+      M = m; S = M.seats[M.turn].S; P = M.seats[M.turn].P;
+      if (S.screen === 'board') S.screen = 'match';
+      if (S.q && S.q.phase === 'guess') S.q.t0 = Date.now();
+    } else if (live && !s.party) {
+      S = s; P = saved.P || store.get('fx-player', null) || { name: 'Explorer', avatar: '🦊' };
+      if (S.q && S.q.phase === 'guess') S.q.t0 = Date.now();
+    } else startScreen();
+    render(false);
+  }
+  const hot = window.claude && window.claude.hot;
+  if (hot && hot.snapshot) hot.snapshot(() => ({ S, P, M }));
+  if (hot && hot.ready) hot.ready(data => boot(data || liveSaved())); else boot((hot && hot.data) || liveSaved());
+
+  window.__fx = { perfects, deck, markSeen, seenList, get match() { return M; }, standings, fitOpts, get sound() { return { ac, master, keepAlive, IOS }; }, ppPages, flagWorth, streakBonus, speedBonus, totals, entryTotal, get state() { return S; }, get player() { return P; }, get opts() { return O; }, C, POOLS, KNOWN, buildRound, tableRows, stamps, shareText, todayKey, AVATARS };
+})();
+</script>

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flag Explorer</title>
+<meta name="description" content="Name the country each flag flies over. Ten flags a round, a daily challenge, and pass and play for the whole family.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#EEF2F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0A1322" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Flag Explorer">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<style>/*__RESET__*/</style>
+<style>/*__FONTS__*/</style>
+<style>/*__TAILWIND__*/</style>
+</head>
+<body>
+<!--__GAME__-->
+
+<!-- Shown when a newer version of the game has been downloaded in the background. -->
+<div id="fx-update" hidden style="position:fixed;left:0;right:0;bottom:0;z-index:60;display:flex;justify-content:center;padding:.75rem 1rem calc(.75rem + env(safe-area-inset-bottom,0px));pointer-events:none">
+  <button type="button" id="fx-update-btn" style="pointer-events:auto;display:flex;align-items:center;gap:.6rem;border:0;border-radius:999px;padding:.7rem 1.1rem;background:#14274A;color:#fff;box-shadow:0 6px 18px rgba(10,19,34,.35),0 0 0 2px #C9A24A;font:600 .95rem/1.2 'Figtree','Segoe UI',system-ui,sans-serif">
+    A new version is ready <span style="color:#E2BE6A;font-weight:700">Refresh</span>
+  </button>
+</div>
+<script>
+// Offline play and updates. The service worker keeps a copy of the game on the device; when a newer copy has been
+// fetched, the player is offered a refresh. A game in progress is saved on the device, so refreshing never loses it.
+(() => {
+  if (!('serviceWorker' in navigator) || !/^https:|^http:\/\/(localhost|127\.)/.test(location.href)) return;
+  const sw = navigator.serviceWorker, hadOne = !!sw.controller, bar = document.getElementById('fx-update');
+  let ready = false, reg = null;
+  sw.register('sw.js').then(r => { reg = r; }).catch(() => {});
+  sw.addEventListener('controllerchange', () => { if (hadOne) { ready = true; bar.hidden = false; } });
+  document.getElementById('fx-update-btn').addEventListener('click', () => location.reload());
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { if (ready) location.reload(); }       // apply a waiting update while the game is out of sight
+    else if (reg) reg.update().catch(() => {});                   // and look for one whenever the game is opened again
+  });
+})();
+</script>
+</body>
+</html>
