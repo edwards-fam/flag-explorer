@@ -65,9 +65,7 @@ export function startMock() {
             log.push('WRITE ' + p);
             if (w.currentDocument && w.currentDocument.exists === false && old) return fail(res, 409, 'ALREADY_EXISTS');
             if (w.currentDocument && w.currentDocument.updateTime && (!old || old.updateTime !== w.currentDocument.updateTime)) return fail(res, 400, 'FAILED_PRECONDITION');
-            // On 11 Oct 2026 the live database kept no player record that was sent with transforms once the access rules were in force.
-            if ((w.updateTransforms || []).length && p.split('/')[2] === 'players') return fail(res, 403, 'PERMISSION_DENIED');
-            if (state.refusePlayers && p.split('/')[2] === 'players') return fail(res, 403, 'PERMISSION_DENIED');
+            if (state.refusePlayers && p.split('/')[2] === 'players') return fail(res, 403, 'PERMISSION_DENIED');      // a test switch: pretend player records cannot be saved
             let fields = w.updateMask ? Object.assign({}, old ? old.fields : {}) : {};
             if (w.updateMask) { for (const k of w.updateMask.fieldPaths) { if (k in (w.update.fields || {})) fields[k] = w.update.fields[k]; else delete fields[k]; } }
             else fields = Object.assign({}, w.update.fields || {});

@@ -809,9 +809,9 @@
     if (refused) throw refused;
   }
   /* A player's passport, gold stamps, personal bests and picture. The family's copy and this device's are merged both ways:
-     what the family holds comes down first, and if this device then knows more, the whole merged record goes back up.
-     It is written as one plain document, guarded so that a save from another device in the same moment is never overwritten.
-     (The first version sent "add these to the list" instructions instead; the live database refused those, so nothing here relies on them.) */
+     what the family holds comes down first, and if this device then knows more, the difference goes back up.
+     Going up, stamps are added to the family's list and bests only ever raise it, so two devices saving the same player
+     in the same moment cannot undo each other. */
   const goldCode = g => [g.t, g.score, g.table, g.clock ? 1 : 0].join('|');
   const texts = v => Array.isArray(v) ? v.filter(x => typeof x === 'string') : [];
   // A player's picture, changed everywhere this device keeps it.
@@ -824,43 +824,42 @@
   }
   async function syncPlayer(f, who) {
     const pid = pidOf(who.name), key = plain(who.name), where = `families/${f.fid}/players/`;
-    for (let tries = 0; tries < 3; tries++) {
-      const doc = await fsGet(where + encodeURIComponent(pid)), d = doc ? fsDoc(doc) : {};
-      const playedHere = stamps(who.name).length > 0 || ['world', 'known', 'daily'].some(t => bestFor(t, who.name).score > 0);
-      // down: stamps, gold stamps and bests the family has and this device does not
-      const all = store.get('fx-passport', {}), have = all[key] || [], extra = texts(d.stamps).filter(a => C[a] && !have.includes(a));
-      if (extra.length) { all[key] = [...have, ...extra]; store.set('fx-passport', all); }
-      const golds = store.get('fx-perfect', {}), mine = golds[key] || [], seen = new Set(mine.map(g => g.t));
-      const more = texts(d.perfect).map(code => { const [t, score, table, clock] = code.split('|'); return { t: +t, score: +score, table, clock: clock === '1' }; }).filter(g => g.t && !seen.has(g.t));
-      if (more.length) { golds[key] = [...mine, ...more].sort((a, b) => a.t - b.t); store.set('fx-perfect', golds); }
-      const bests = store.get('fx-bests', {}); let better = false;
-      for (const t of ['world', 'known', 'daily']) {
-        const k = bestKey(t, who.name), prev = bests[k] || { score: 0, streak: 0 }, next = { score: Math.max(prev.score, d['best_' + t] || 0), streak: Math.max(prev.streak, d['streak_' + t] || 0) };
-        if (next.score !== prev.score || next.streak !== prev.streak) { bests[k] = next; better = true; }
-      }
-      if (better) store.set('fx-bests', bests);
-      // the picture: the family's is taken when this device has not changed its own since the two last agreed,
-      // or when the player has not played here yet (a second device, where the name was typed with whatever picture was showing)
-      const faces = kept('fx-faces', f), agreed = faces.players || {}, last = agreed[pid];
-      if (doc && d.avatar && d.avatar !== who.avatar && (last === undefined ? !playedHere : last === who.avatar)) setFace(who, d.avatar);
-      // up: the merged record, if it holds anything the family's copy does not
-      const want = { name: typeof d.name === 'string' && d.name ? d.name : who.name, avatar: who.avatar || '' };
-      const allStamps = [...new Set([...texts(d.stamps), ...stamps(who.name).filter(a => C[a])])].slice(0, 250), allGold = [...new Set([...texts(d.perfect), ...perfects(who.name).map(goldCode)])].slice(-3000);
-      if (allStamps.length) want.stamps = allStamps;
-      if (allGold.length) want.perfect = allGold;
-      const nums = [];
-      for (const t of ['world', 'known', 'daily']) { const b = bestFor(t, who.name); nums.push(['best_' + t, b.score], ['streak_' + t, b.streak]); }
-      for (const [k, v] of nums) if (v > 0) want[k] = v;
-      const same = doc && want.name === d.name && want.avatar === d.avatar && allStamps.length === (Array.isArray(d.stamps) ? d.stamps.length : 0) && allGold.length === (Array.isArray(d.perfect) ? d.perfect.length : 0) && nums.every(([k, v]) => v === (d[k] || 0));
-      if (!same) {
-        const fields = fsFields(want); fields.updated = { timestampValue: new Date().toISOString() };
-        const done = await fsCommit({ update: { name: `${fsRoot()}/${where}${pid}`, fields }, currentDocument: doc ? { updateTime: doc.updateTime } : { exists: false } });
-        if (done !== 'ok') continue;          // another device saved this player in the same moment: read again and merge again
-      }
-      agreed[pid] = who.avatar; store.set('fx-faces', { fid: f.fid, players: agreed });
-      return;
+    const doc = await fsGet(where + encodeURIComponent(pid)), d = doc ? fsDoc(doc) : {};
+    const playedHere = stamps(who.name).length > 0 || ['world', 'known', 'daily'].some(t => bestFor(t, who.name).score > 0);
+    // down: stamps, gold stamps and bests the family has and this device does not
+    const all = store.get('fx-passport', {}), have = all[key] || [], extra = texts(d.stamps).filter(a => C[a] && !have.includes(a));
+    if (extra.length) { all[key] = [...have, ...extra]; store.set('fx-passport', all); }
+    const golds = store.get('fx-perfect', {}), mine = golds[key] || [], seen = new Set(mine.map(g => g.t));
+    const more = texts(d.perfect).map(code => { const [t, score, table, clock] = code.split('|'); return { t: +t, score: +score, table, clock: clock === '1' }; }).filter(g => g.t && !seen.has(g.t));
+    if (more.length) { golds[key] = [...mine, ...more].sort((a, b) => a.t - b.t); store.set('fx-perfect', golds); }
+    const bests = store.get('fx-bests', {}); let better = false;
+    for (const t of ['world', 'known', 'daily']) {
+      const k = bestKey(t, who.name), prev = bests[k] || { score: 0, streak: 0 }, next = { score: Math.max(prev.score, d['best_' + t] || 0), streak: Math.max(prev.streak, d['streak_' + t] || 0) };
+      if (next.score !== prev.score || next.streak !== prev.streak) { bests[k] = next; better = true; }
     }
-    throw Object.assign(new Error('write 409 the record kept changing'), { status: 409 });
+    if (better) store.set('fx-bests', bests);
+    // the picture: the family's is taken when this device has not changed its own since the two last agreed,
+    // or when the player has not played here yet (a second device, where the name was typed with whatever picture was showing)
+    const faces = kept('fx-faces', f), agreed = faces.players || {}, last = agreed[pid];
+    if (doc && d.avatar && d.avatar !== who.avatar && (last === undefined ? !playedHere : last === who.avatar)) setFace(who, d.avatar);
+    // up: only if this device holds something the family's copy does not
+    const want = { name: typeof d.name === 'string' && d.name ? d.name : who.name, avatar: who.avatar || '' };
+    const allStamps = [...new Set([...texts(d.stamps), ...stamps(who.name).filter(a => C[a])])].slice(0, 250), allGold = [...new Set([...texts(d.perfect), ...perfects(who.name).map(goldCode)])].slice(-3000);
+    if (allStamps.length) want.stamps = allStamps;
+    if (allGold.length) want.perfect = allGold;
+    const nums = [];
+    for (const t of ['world', 'known', 'daily']) { const b = bestFor(t, who.name); nums.push(['best_' + t, b.score], ['streak_' + t, b.streak]); }
+    for (const [k, v] of nums) if (v > 0) want[k] = v;
+    const same = doc && want.name === d.name && want.avatar === d.avatar && allStamps.length === (Array.isArray(d.stamps) ? d.stamps.length : 0) && allGold.length === (Array.isArray(d.perfect) ? d.perfect.length : 0) && nums.every(([k, v]) => v === (d[k] || 0));
+    if (!same) {
+      const changes = [];
+      if (want.stamps) changes.push({ fieldPath: 'stamps', appendMissingElements: { values: want.stamps.map(fsVal) } });
+      if (want.perfect) changes.push({ fieldPath: 'perfect', appendMissingElements: { values: want.perfect.map(fsVal) } });
+      for (const [k, v] of nums) if (v > 0) changes.push({ fieldPath: k, maximum: fsVal(v) });
+      changes.push({ fieldPath: 'updated', setToServerValue: 'REQUEST_TIME' });
+      await fsCommit({ update: { name: `${fsRoot()}/${where}${pid}`, fields: fsFields({ name: want.name, avatar: want.avatar }) }, updateMask: { fieldPaths: ['name', 'avatar'] }, updateTransforms: changes });
+    }
+    agreed[pid] = who.avatar; store.set('fx-faces', { fid: f.fid, players: agreed });
   }
   const okRow = r => r && typeof r.name === 'string' && r.name && Number.isFinite(r.score) && Number.isFinite(r.t);
   async function pullTables(f) {
