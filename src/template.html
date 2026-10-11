@@ -249,6 +249,8 @@
   .fx-hrow.top .fx-hrank { color: var(--ochre); }
   .fx-hrow.hot { background: var(--gold-tint); border-radius: 10px; }
   .fx-hrow.empty { color: var(--ink-soft); }
+  .fx-day { display: grid; grid-template-columns: 5.4rem minmax(0, 1fr) auto; align-items: baseline; column-gap: .65rem; padding: .4rem .5rem; }
+  .fx-day + .fx-day { border-top: 1px solid var(--rule); }
 
   /* Game choices on the second screen */
   .fx-mode {
@@ -488,7 +490,12 @@
     return fmt(Number(n.toPrecision(2)));
   }
   const pad2 = n => String(n).padStart(2, '0');
-  const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
+  const dayKey = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  const todayKey = () => dayKey(new Date());
+  const keyDate = key => { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d); };
+  const dayShift = (key, n) => { const d = keyDate(key); d.setDate(d.getDate() + n); return dayKey(d); };
+  const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const dayLabel = key => { const d = keyDate(key); return `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()]} ${d.getDate()} ${MONTH_NAMES[d.getMonth()].slice(0, 3)}`; };
   const todayLabel = () => { const d = new Date(); return `${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()]} ${d.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()]}`; };
 
   /* ---------- Scoring ---------- */
@@ -652,12 +659,57 @@
   }
   // Starting fresh: everything this device has recorded about play (scores, today's result, personal bests, passports and
   // gold stamps). Settings stay. Offered only while the device is outside a family, because shared scores cannot be taken back.
-  const RECORDS = ['fx-tables', 'fx-bests', 'fx-perfect', 'fx-passport'];
+  const RECORDS = ['fx-tables', 'fx-bests', 'fx-perfect', 'fx-passport', 'fx-days'];
   const anyRecords = () => dailyData().rows.length > 0 || RECORDS.some(k => Object.values(store.get(k, {}) || {}).some(v => v && (v.length || v.score)));
   function wipeRecords() {
     [...RECORDS, 'fx-people'].forEach(k => store.set(k, {}));
-    ['fx-daily', 'fx-cloud', 'fx-synced', 'fx-pushed', 'fx-live'].forEach(k => store.set(k, null));
+    ['fx-daily', 'fx-cloud', 'fx-cloud-days', 'fx-synced', 'fx-pushed', 'fx-live'].forEach(k => store.set(k, null));
   }
+  /* ---------- Daily wins ----------
+     Each finished day of Today's challenge has a winner: the top score that day. A tie gives each of them a win, and a player
+     who was the only one to play still wins. Wins are never stored. They are counted from the days' scores, so every device
+     in a family arrives at the same standings. A day is counted once it is over, which is why today is never in the count. */
+  const DAY_ONE = '2026-10-11';                           // the family scoreboard's first day: nothing older exists to fetch
+  const LATE = 3;                                         // days after its own that a score may still arrive (a device that was offline, a later time zone)
+  // This device's own first tries, day by day. Today's table forgets at midnight; this does not.
+  function logDay(date, row) {
+    const all = store.get('fx-days', {}), rows = all[date] || [];
+    if (!row || !row.name || rows.some(r => pidOf(r.name) === pidOf(row.name))) return;
+    all[date] = [...rows, { name: row.name, avatar: row.avatar, score: row.score, streak: row.streak || 0, clock: !!row.clock, perfect: !!row.perfect, t: row.t }];
+    store.set('fx-days', all);
+  }
+  // Every finished day that has scores, oldest first: date → that day's rows, one per player.
+  function daysBook() {
+    const today = todayKey(), f = family(), cache = f && store.get('fx-cloud-days', null), shared = cache && cache.fid === f.fid && cache.days ? cache.days : {};
+    const own = store.get('fx-days', {}), recent = dayShift(today, -LATE), book = new Map();
+    for (const date of [...new Set([...Object.keys(shared), ...Object.keys(own)])].sort()) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date >= today) continue;
+      // In a family the family's copy is the record. This device's own rows are added only while they can still be sent up.
+      const mine = !f || date >= recent ? own[date] || [] : [], seen = new Set(), rows = [];
+      for (const r of [...((shared[date] && shared[date].rows) || []), ...mine]) { if (!r || !r.name || !Number.isFinite(r.score)) continue; const k = pidOf(r.name); if (!seen.has(k)) { seen.add(k); rows.push(r); } }
+      if (rows.length) book.set(date, rows);
+    }
+    return book;
+  }
+  const dayWinners = rows => { const top = Math.max(...rows.map(r => r.score)); return rows.filter(r => r.score === top); };
+  // Standings for a span of days: 'all', or a month as 'YYYY-MM'. Equal wins share a place.
+  function winsTable(span, book = daysBook()) {
+    const who = new Map();
+    for (const [date, rows] of book) {
+      if (span !== 'all' && !date.startsWith(span)) continue;
+      const won = dayWinners(rows);
+      for (const r of rows) {
+        const k = pidOf(r.name), e = who.get(k) || { name: r.name, avatar: r.avatar, wins: 0, played: 0, t: 0 };
+        if (r.t >= e.t) { e.name = r.name; e.avatar = r.avatar; e.t = r.t; }       // the name and picture they used most recently
+        e.played++; if (won.includes(r)) e.wins++;
+        who.set(k, e);
+      }
+    }
+    const list = [...who.values()].sort((a, b) => b.wins - a.wins || b.played - a.played || (plain(a.name) < plain(b.name) ? -1 : 1));
+    list.forEach((e, i) => { e.place = i && list[i - 1].wins === e.wins ? list[i - 1].place : i + 1; });
+    return list;
+  }
+  const ordinal = n => ORD[n - 1] || n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
   const bestKey = (table, name) => table + '|' + plain(name);
   const bestFor = (table, name) => store.get('fx-bests', {})[bestKey(table, name)] || { score: 0, streak: 0 };
   // A perfect round: all ten flags and all ten bonus questions in one recorded ten-flag round. The wager plays no part.
@@ -742,6 +794,9 @@
     const sent = kept('fx-synced', f), done = new Set(sent.ids || []), todo = [], tables = store.get('fx-tables', {}), d = dailyData();
     for (const table of ['world', 'known']) for (const r of tables[table] || []) if (r && r.name && r.t && r.score > 0) todo.push([`${table}/${rowKey(r)}`, `tables/${table}/entries/${pidOf(r.name)}_${r.t}`, r]);
     for (const r of d.rows) if (r && r.name && r.t && !r.cloud) todo.push([`days/${d.date}/${pidOf(r.name)}`, `days/${d.date}/entries/${pidOf(r.name)}`, r]);
+    // a challenge played with no connection is still sent for a few days afterwards, so it counts towards that day's win
+    const own = store.get('fx-days', {});
+    for (let back = 1; back <= LATE; back++) { const date = dayShift(d.date, -back); for (const r of own[date] || []) if (r && r.name && r.t) todo.push([`days/${date}/${pidOf(r.name)}`, `days/${date}/entries/${pidOf(r.name)}`, r]); }
     for (const [id, path, r] of todo) {
       if (done.has(id)) continue;
       await fsCommit({ update: { name: `${fsRoot()}/families/${f.fid}/${path}`, fields: fsFields({ name: r.name, avatar: r.avatar || '', score: r.score, streak: r.streak || 0, clock: !!r.clock, perfect: !!r.perfect, t: r.t }) }, currentDocument: { exists: false } });
@@ -792,6 +847,24 @@
     if (d.date === day) { d.rows = [...d.rows.filter(r => !theirs.some(c => pidOf(c.name) === pidOf(r.name))), ...theirs].sort(byScore); store.set('fx-daily', d); }
     store.set('fx-cloud', cache);
   }
+  // The family's finished days, for the daily wins. A day old enough that nothing more can arrive is fetched once and kept;
+  // the last few are looked at again, but not more than every few minutes unless someone is looking at the standings.
+  async function pullDays(f, keen) {
+    const cache = kept('fx-cloud-days', f), days = cache.days || {}, today = todayKey(), settled = dayShift(today, -LATE - 1), want = [];
+    let from = dayShift(today, -1500); if (from < DAY_ONE) from = DAY_ONE;
+    for (let k = from; k < today; k = dayShift(k, 1)) if (!(days[k] && days[k].done)) want.push(k);
+    const age = Date.now() - (cache.at || 0);
+    if (!want.length || (want.every(k => days[k]) && age >= 0 && age < (keen ? 20000 : 300000))) return;
+    const save = () => store.set('fx-cloud-days', { fid: f.fid, at: Date.now(), days });
+    for (let i = 0; i < want.length; i += 6) {
+      await Promise.all(want.slice(i, i + 6).map(async k => {
+        const res = await fsGet(`families/${f.fid}/days/${k}/entries?pageSize=60`);
+        days[k] = { rows: ((res && res.documents) || []).map(fsDoc).filter(okRow).map(r => ({ name: r.name, avatar: r.avatar, score: r.score, t: r.t })), done: k < settled };
+      }));
+      if (i + 6 < want.length) save();
+    }
+    save();
+  }
   const cloudState = { busy: false, again: false, ok: null, at: 0 };
   async function cloudSync() {
     const f = family();
@@ -804,6 +877,7 @@
       for (const who of people) await pushPlayer(f, who);
       for (const who of people) await pullPlayer(f, who);
       await pullTables(f);
+      await pullDays(f, S.screen === 'family' || (S.screen === 'board' && S.tab === 'wins'));
       cloudState.ok = true;
     } catch (e) { cloudState.ok = false; }
     cloudState.busy = false; cloudState.at = Date.now();
@@ -1026,7 +1100,7 @@
       if (S.perfect) { row.perfect = true; addPerfect({ t, score: S.score, table: S.table, clock: S.clock }); }
       let list = null;
       if (S.table === 'daily') {          // today's challenge keeps every first try, even a zero
-        const d = dailyData(); d.rows = [...d.rows, row].sort(byScore); store.set('fx-daily', d); list = d.rows;
+        const d = dailyData(); d.rows = [...d.rows, row].sort(byScore); store.set('fx-daily', d); list = d.rows; logDay(d.date, row);
       } else if (S.score > 0) {
         const tables = store.get('fx-tables', {}); list = tables[S.table] = [...(tables[S.table] || []), row].sort(byScore).slice(0, 10); store.set('fx-tables', tables);
       }
@@ -1190,7 +1264,7 @@
       <div class="grid gap-2 mt-3">
         <button type="button" class="fx-mode" data-act="opt" data-k="mode" data-v="daily" aria-pressed="${daily}">
           <span class="flex items-baseline justify-between gap-3"><b>Today's challenge</b><span class="fx-label">${todayLabel()}</span></span>
-          <small>${played ? `You scored ${fmt(played.score)} today. Playing again is practice and is not recorded.` : 'The same ten flags for everyone today. Your first try is the one that counts.'}</small>
+          <small>${played ? `You scored ${fmt(played.score)} today. Playing again is practice and is not recorded.` : 'The same ten flags for everyone today. Your first try is the one that counts, and the top score wins the day.'}</small>
         </button>
         <button type="button" class="fx-mode" data-act="opt" data-k="mode" data-v="free" aria-pressed="${O.mode === 'free'}">
           <span><b>Free play</b></span>
@@ -1230,9 +1304,40 @@
     </main>`;
   }
 
+  // The daily wins: who has won Today's challenge most often, this month and since the start
+  const nameList = list => { const n = list.map(e => esc(e.name)); return n.length < 3 ? n.join(' and ') : n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1]; };
+  function viewWins() {
+    const book = daysBook(), month = todayKey().slice(0, 7), all = S.span === 'all', monthName = MONTH_NAMES[+month.slice(5) - 1];
+    const list = winsTable(all ? 'all' : month, book), lead = list.filter(e => e.place === 1);
+    const rows = (list.length ? list.slice(0, 30) : [null, null, null]).map((e, i) => `<li class="fx-hrow ${e ? '' : 'empty'} ${e && e.place === 1 ? 'top' : ''}">
+        <span class="fx-hrank">${e ? ordinal(e.place) : ORD[i]}</span>
+        <span class="fx-ava ${e ? '' : 'blank'}" style="--s:2.1rem" aria-hidden="true">${e ? esc(e.avatar) : ''}</span>
+        <span class="min-w-0"><span class="fx-clip whitespace-nowrap block ${e ? 'font-medium' : ''}">${e ? esc(e.name) : '· · ·'}</span>${e ? `<span class="fx-label fx-clip whitespace-nowrap block" style="margin-top:.1rem">played ${plural(e.played, 'day')}</span>` : ''}</span>
+        <span class="fx-num text-lg">${e ? fmt(e.wins) : ''}</span>
+      </li>`).join('');
+    const foot = !list.length ? (all ? 'No finished days yet.' : `No finished days in ${monthName} yet.`)
+      : lead.length > 1 ? `${nameList(lead)} share the lead with ${plural(lead[0].wins, 'win')} each.`
+      : `${esc(lead[0].name)} leads ${all ? 'overall' : monthName} with ${plural(lead[0].wins, 'win')}.`;
+    // last month's result stays in view while the new month is young
+    const before = dayShift(month + '-01', -1).slice(0, 7), past = all ? [] : winsTable(before, book).filter(e => e.place === 1);
+    const lastMonth = past.length ? `${MONTH_NAMES[+before.slice(5) - 1]} went to ${nameList(past)} with ${plural(past[0].wins, 'win')}${past.length > 1 ? ' each' : ''}.` : '';
+    const recent = [...book].slice(-7).reverse().map(([date, day]) => { const won = dayWinners(day);
+      return `<li class="fx-day"><span class="fx-label">${dayLabel(date)}</span><span class="fx-clip whitespace-nowrap min-w-0">${won.map(r => `<span aria-hidden="true">${esc(r.avatar)}</span> ${esc(r.name)}`).join(' · ')}</span><span class="fx-num">${fmt(won[0].score)}</span></li>`; }).join('');
+    const spanBtn = (v, label) => `<button type="button" class="fx-pick" data-act="span" data-v="${v}" aria-pressed="${all === (v === 'all')}">${label}</button>`;
+    return `<p class="fx-label mt-5" id="fx-span-l">Wins counted over</p>
+      <div class="grid grid-cols-2 gap-2 mt-1" role="group" aria-labelledby="fx-span-l" id="fx-span">${spanBtn('month', monthName)}${spanBtn('all', 'All time')}</div>
+      <div class="fx-hhead fx-label mt-5" aria-hidden="true"><span>Rank</span><span style="width:2.1rem"></span><span>Explorer</span><span>Wins</span></div>
+      <ol id="fx-wins">${rows}</ol>
+      <p class="font-script text-lg text-center mt-4" id="fx-wins-foot">${foot}</p>
+      ${lastMonth ? `<p class="text-sm text-center mt-1" id="fx-wins-last">${lastMonth}</p>` : ''}
+      ${recent ? `<p class="fx-label mt-6">Recent winners</p><ul class="mt-1" id="fx-days">${recent}</ul>` : ''}
+      ${family() ? `<p class="text-sm text-ink-soft text-center mt-4" id="fx-cloud-note" role="status">${cloudNote()}</p>` : ''}
+      <p class="text-sm text-ink-soft text-center mt-2" id="fx-wins-key">The top score in Today's challenge wins the day, and a tie gives each player a win. Today's winner is counted at midnight.</p>`;
+  }
+
   // The high-score tables: a ledger of ten lines per table, the newest entry marked
   function viewBoard() {
-    const tab = S.tab, list = tableRows(tab), fromEnd = S.back === 'end' || S.back === 'match', party = fromEnd && S.party && M;
+    const tab = S.tab, wins = tab === 'wins', list = wins ? [] : tableRows(tab), fromEnd = S.back === 'end' || S.back === 'match', party = fromEnd && S.party && M;
     const mine = fromEnd && !party && S.entryT && tab === S.table ? list.findIndex(r => r.t === S.entryT) : -1;
     const fresh = party && tab === S.table ? M.seats.map(seat => seat.S.entryT).filter(Boolean) : [];
     const rows = ORD.map((o, i) => {
@@ -1244,9 +1349,9 @@
         <span class="fx-num text-lg">${r ? fmt(r.score) : ''}</span>
       </li>`;
     }).join('');
-    const sub = tab === 'daily' ? `Today's challenge · ${todayLabel()}` : POOLS[tab].label;
+    const sub = wins ? 'Daily wins' : tab === 'daily' ? `Today's challenge · ${todayLabel()}` : POOLS[tab].label;
     const foot = mine >= 0 ? `${esc(P.name)} takes ${ORD[mine]} place.`
-      : list.length ? (tab === 'daily' ? 'A new challenge opens at midnight.' : 'Beat a score here to enter the table.')
+      : list.length ? (tab === 'daily' ? 'The top score at midnight wins the day.' : 'Beat a score here to enter the table.')
       : tab === 'daily' ? 'Nobody has played today yet.' : 'No scores yet. Finish a round to enter the table.';
     const tabBtn = (v, label) => `<button type="button" class="fx-pick" data-act="tab" data-v="${v}" aria-pressed="${tab === v}">${label}</button>`;
     return `<main class="fx-sheet mx-auto max-w-xl">
@@ -1257,12 +1362,12 @@
           <p class="fx-label mt-1.5">${sub} · ${family() ? 'your family' : 'this device'}</p>
         </div>
       </div>
-      <div class="grid grid-cols-3 gap-2" role="group" aria-label="Which table">${tabBtn('world', 'Whole world')}${tabBtn('known', 'Well-known')}${tabBtn('daily', 'Today')}</div>
-      <div class="fx-hhead fx-label mt-5" aria-hidden="true"><span>Rank</span><span style="width:2.1rem"></span><span>Explorer</span><span>Score</span></div>
+      <div class="grid grid-cols-2 gap-2" role="group" aria-label="Which table">${tabBtn('world', 'Whole world')}${tabBtn('known', 'Well-known')}${tabBtn('daily', 'Today')}${tabBtn('wins', 'Daily wins')}</div>
+      ${wins ? viewWins() : `<div class="fx-hhead fx-label mt-5" aria-hidden="true"><span>Rank</span><span style="width:2.1rem"></span><span>Explorer</span><span>Score</span></div>
       <ol>${rows}</ol>
       <p class="font-script text-lg text-center mt-4">${foot}</p>
       ${family() ? `<p class="text-sm text-ink-soft text-center mt-2" id="fx-cloud-note" role="status">${cloudNote()}</p>` : ''}
-      <p class="text-sm text-ink-soft text-center mt-2" id="fx-star-key">${STAR} marks a perfect round: all ${ROUND} flags and all ${ROUND} bonus questions.</p>
+      <p class="text-sm text-ink-soft text-center mt-2" id="fx-star-key">${STAR} marks a perfect round: all ${ROUND} flags and all ${ROUND} bonus questions.</p>`}
       ${fromEnd && S.mode === 'free' && !S.party ? `<button class="fx-go mt-5" data-act="again" data-primary>Play again as ${esc(P.name)}</button>
         <button class="fx-quiet block mx-auto mt-3" data-act="back">Back to results</button>`
         : `<button class="fx-go mt-5" data-act="back" data-primary>${fromEnd ? 'Back to results' : 'Back'}</button>`}
@@ -1825,7 +1930,8 @@
     if (act === 'guest-add') { if (O.guests.length < SEATS - 1) O.guests.push({ name: '', avatar: spareAvatar() }); tidyParty(); render(false); const boxes = app.querySelectorAll('.fx-guest'); boxes[boxes.length - 1].focus(); return; }
     if (act === 'guest-del') { O.guests.splice(+el.dataset.i, 1); tidyParty(); return render(false); }
     if (act === 'guest-ava') { O.guests[+el.dataset.i].avatar = spareAvatar(); SFX.tap(); return render(false); }
-    if (act === 'tab') { S.tab = el.dataset.v; S.confirmWipe = false; return render(false); }
+    if (act === 'tab') { S.tab = el.dataset.v; S.confirmWipe = false; if (S.tab === 'wins') cloudSoon(); return render(false); }
+    if (act === 'span') { S.span = el.dataset.v; return render(false); }
     if (act === 'wipe') {
       if (!S.confirmWipe) { S.confirmWipe = true; return render(false); }
       wipeRecords(); S.confirmWipe = false; SFX.tap();
@@ -1835,7 +1941,7 @@
     if (act === 'family-sync') { cloudState.ok = null; cloudSync(); return render(false); }
     if (act === 'family-leave') {
       if (!S.confirmLeave) { S.confirmLeave = true; return render(false); }
-      ['fx-family', 'fx-cloud', 'fx-synced', 'fx-pushed'].forEach(k => store.set(k, null)); S.confirmLeave = false; cloudState.ok = null;
+      ['fx-family', 'fx-cloud', 'fx-cloud-days', 'fx-synced', 'fx-pushed'].forEach(k => store.set(k, null)); S.confirmLeave = false; cloudState.ok = null;
       return render(false);
     }
     if (act === 'claim-no') { S.claim = null; S.name = ''; render(false); app.querySelector('#fx-name').focus(); return; }
@@ -1898,6 +2004,7 @@
     return v;
   }
   function boot(saved) {
+    { const d = dailyData(); for (const r of d.rows) if (!r.cloud) logDay(d.date, r); }      // results from before the day log existed
     cloudSync();
     const s = saved && saved.S, live = s && Array.isArray(s.round) && s.round.every(r => r && C[r.a2] && r.bonus) && (s.screen === 'play' || s.screen === 'end');
     const m = saved && saved.M, okRound = x => x && Array.isArray(x.round) && x.round.every(r => r && C[r.a2] && r.bonus);
@@ -1915,6 +2022,6 @@
   if (hot && hot.snapshot) hot.snapshot(() => ({ S, P, M }));
   if (hot && hot.ready) hot.ready(data => boot(data || liveSaved())); else boot((hot && hot.data) || liveSaved());
 
-  window.__fx = { family, cloudSync, cloudState, pidOf, perfects, deck, markSeen, seenList, get match() { return M; }, standings, fitOpts, get sound() { return { ac, master, keepAlive, IOS }; }, ppPages, flagWorth, streakBonus, speedBonus, totals, entryTotal, get state() { return S; }, get player() { return P; }, get opts() { return O; }, C, POOLS, KNOWN, buildRound, tableRows, stamps, shareText, todayKey, AVATARS };
+  window.__fx = { winsTable, daysBook, dayShift, family, cloudSync, cloudState, pidOf, perfects, deck, markSeen, seenList, get match() { return M; }, standings, fitOpts, get sound() { return { ac, master, keepAlive, IOS }; }, ppPages, flagWorth, streakBonus, speedBonus, totals, entryTotal, get state() { return S; }, get player() { return P; }, get opts() { return O; }, C, POOLS, KNOWN, buildRound, tableRows, stamps, shareText, todayKey, AVATARS };
 })();
 </script>
