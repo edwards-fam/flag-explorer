@@ -24,7 +24,9 @@ export function startMock() {
   }
   const send = (res, status, body) => { res.writeHead(status, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type', 'access-control-allow-methods': 'GET,POST,PATCH,OPTIONS' }); res.end(JSON.stringify(body)); };
   const fail = (res, status, code) => send(res, status, { error: { code: status, status: code, message: code } });
-  const state = { down: false, requests: 0, withKey: 0, noKey: 0, validKey: null, keyRequired: false };
+  const state = { down: false, requests: 0, withKey: 0, noKey: 0, validKey: null, keyRequired: false, refusePlayers: false };
+  let tick = 0;
+  const stamp = () => new Date(Date.now() + ++tick).toISOString();          // every save gets a time of its own
   const server = http.createServer((req, res) => {
     if (req.method === 'OPTIONS') return send(res, 204, {});
     state.requests++;
@@ -62,6 +64,10 @@ export function startMock() {
             const p = w.update.name.slice(base.length + 1), r = rule(p), old = staged.get(p) || docs.get(p);
             log.push('WRITE ' + p);
             if (w.currentDocument && w.currentDocument.exists === false && old) return fail(res, 409, 'ALREADY_EXISTS');
+            if (w.currentDocument && w.currentDocument.updateTime && (!old || old.updateTime !== w.currentDocument.updateTime)) return fail(res, 400, 'FAILED_PRECONDITION');
+            // On 11 Oct 2026 the live database kept no player record that was sent with transforms once the access rules were in force.
+            if ((w.updateTransforms || []).length && p.split('/')[2] === 'players') return fail(res, 403, 'PERMISSION_DENIED');
+            if (state.refusePlayers && p.split('/')[2] === 'players') return fail(res, 403, 'PERMISSION_DENIED');
             let fields = w.updateMask ? Object.assign({}, old ? old.fields : {}) : {};
             if (w.updateMask) { for (const k of w.updateMask.fieldPaths) { if (k in (w.update.fields || {})) fields[k] = w.update.fields[k]; else delete fields[k]; } }
             else fields = Object.assign({}, w.update.fields || {});
@@ -74,7 +80,7 @@ export function startMock() {
             const data = Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, plainVal(v)]));
             const check = r && (old ? r.update : r.create);
             if (!check || !check(data)) return fail(res, 403, 'PERMISSION_DENIED');
-            staged.set(p, { fields, createTime: old ? old.createTime : now(), updateTime: now() });
+            staged.set(p, { fields, createTime: old ? old.createTime : now(), updateTime: stamp() });
           }
         } catch (e) { return fail(res, 400, 'INVALID_ARGUMENT'); }
         for (const [p, d] of staged) docs.set(p, d);

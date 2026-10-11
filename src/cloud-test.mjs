@@ -121,5 +121,44 @@ eq(await D.evaluate(() => localStorage.getItem('fx-cloud-key')), '"no"', 'and th
 const keyed = mock.state.withKey; await sync(D); eq(mock.state.withKey, keyed, 'no further requests with the rejected key');
 mock.state.validKey = null;
 
+// ---- 10. one player on two devices: the same picture and passport, whichever way round they set up
+mock.state.validKey = null;
+const who = p => p.evaluate(() => ({ ...window.__fx.player }));
+const playerDoc = (fid, pid) => { const d = mock.docs.get(`families/${fid}/players/${pid}`); return d ? mock.plain(d) : null; };
+const E = await device('E'); await join(E, 'two-devices-1'); const fid2 = (await E.evaluate(() => window.__fx.family())).fid;
+await enter(E, 'Casey'); const face = (await who(E)).avatar; await sync(E);
+eq(playerDoc(fid2, 'casey').avatar, face, 'the family holds the picture chosen on the first device'); await round(E, 'free'); await sync(E);
+eq(playerDoc(fid2, 'casey').stamps.length, 10, 'and the passport after a round'); eq(playerDoc(fid2, 'casey').best_world, 1680, 'and the personal best');
+// second device joins first, then types the name: it is asked, and saying yes brings the picture
+const F = await device('F'); await join(F, 'two-devices-1'); await F.fill('#fx-name', 'casey'); await F.click('#fx-setup [type=submit]'); await F.waitForSelector('#fx-claim');
+assert((await txt(F, '#fx-claim')).includes(face), 'the question shows the picture the family knows'); await F.screenshot({ path: 'c8-claim-picture.png', fullPage: true });
+await F.click('#fx-claim [type=submit]'); await F.waitForFunction(() => window.__fx.state.screen === 'rules'); await settle(F);
+eq((await who(F)).avatar, face, 'saying yes brings the same picture'); eq((await who(F)).name, 'Casey', 'and the name as the family spells it');
+eq(await F.evaluate(() => window.__fx.stamps('Casey').length), 10, 'and the passport'); eq(playerDoc(fid2, 'casey').avatar, face, 'the family’s copy is unchanged');
+// third device: the name is typed before the family code, with whatever picture was showing
+const G = await device('G'); await enter(G, 'Casey'); const stray = (await who(G)).avatar; await G.click('[data-act=rules-back]');
+await join(G, 'two-devices-1'); await sync(G);
+if (stray !== face) { eq((await who(G)).avatar, face, 'a device the player has not played on takes the family’s picture'); eq(playerDoc(fid2, 'casey').avatar, face, 'and does not overwrite it'); }
+// a deliberate change of picture on one device follows the player to the others
+await F.click('[data-act=rules-back]'); await F.click('[data-act=shuffle]'); const fresh = await F.evaluate(now => [...document.querySelectorAll('#fx-hand [data-act=avatar]')].map(b => b.dataset.e).find(e => e !== now), face);
+await F.click(`#fx-hand [data-act=avatar][data-e="${fresh}"]`); await F.click('#fx-setup [type=submit]'); await F.waitForFunction(() => window.__fx.state.screen === 'rules'); await settle(F);
+eq(playerDoc(fid2, 'casey').avatar, fresh, 'a new picture chosen on one device reaches the family'); await sync(E); eq((await who(E)).avatar, fresh, 'and then the first device'); eq(playerDoc(fid2, 'casey').stamps.length, 10, 'the passport is untouched by it');
+await sync(G); eq((await who(G)).avatar, fresh, 'and the third');
+// two devices saving the same player in the same moment: neither loses anything
+await E.evaluate(() => { const all = JSON.parse(localStorage.getItem('fx-passport')); all.casey = [...all.casey, 'FR', 'JP'].filter((a, i, l) => l.indexOf(a) === i); localStorage.setItem('fx-passport', JSON.stringify(all)); });
+await F.evaluate(() => { const all = JSON.parse(localStorage.getItem('fx-passport')); all.casey = [...all.casey, 'BR', 'KE'].filter((a, i, l) => l.indexOf(a) === i); localStorage.setItem('fx-passport', JSON.stringify(all)); });
+await E.reload(); await F.reload(); await E.waitForTimeout(250); await Promise.all([settle(E), settle(F)]); await Promise.all([sync(E), sync(F)]); await sync(E); await sync(F);
+const merged = playerDoc(fid2, 'casey').stamps; assert(['FR', 'JP', 'BR', 'KE'].every(a => merged.includes(a)), 'stamps from both devices are kept: ' + merged.join()); eq(new Set(merged).size, merged.length, 'none twice');
+eq(await E.evaluate(() => window.__fx.stamps('Casey').length), merged.length, 'and both devices end up with all of them');
+
+// ---- 11. if player records cannot be saved, the scores are still shared and still fetched
+mock.state.refusePlayers = true;
+const H = await device('H'); await join(H, 'two-devices-1'); await enter(H, 'Morgan'); const hScore = await round(H, 'free', 2);
+assert(docsUnder(fid2 + '/tables/world/entries/morgan_').length === 1, 'the score still reaches the family'); eq(playerDoc(fid2, 'morgan'), null, 'though the player record was refused');
+eq((await boardRows(H, 'world')).rows.length, 2, 'and the family’s scores still arrive'); eq(await H.evaluate(() => window.__fx.cloudState.ok), true, 'the scoreboard counts as working');
+await H.click('[data-act=board]'); assert((await txt(H, '#fx-cloud-note')).includes('Scores are shared with your family'), 'the status line says the scores are shared'); await H.click('[data-act=back]');
+await H.click('[data-act=change-player]'); await H.click('[data-act=family]'); assert((await txt(H, '#fx-cloud-detail')).includes('player morgan: write 403'), 'the family screen says what was refused'); await H.screenshot({ path: 'c9-family-problem.png', fullPage: true }); await H.click('[data-act=back]');
+mock.state.refusePlayers = false; await sync(H); eq(playerDoc(fid2, 'morgan').stamps.length, 9, 'once records can be saved again, the passport goes up'); eq(await H.evaluate(() => window.__fx.cloudState.problems.length), 0, 'and the problem clears');
+
 await browser.close(); mock.close();
 console.log(errors.length ? errors.join('\n') : 'FAMILY SCOREBOARD CHECKS PASSED');

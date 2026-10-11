@@ -701,7 +701,7 @@
   const anyRecords = () => dailyData().rows.length > 0 || RECORDS.some(k => Object.values(store.get(k, {}) || {}).some(v => v && (v.length || v.score)));
   function wipeRecords() {
     [...RECORDS, 'fx-people'].forEach(k => store.set(k, {}));
-    ['fx-daily', 'fx-cloud', 'fx-cloud-days', 'fx-synced', 'fx-pushed', 'fx-live'].forEach(k => store.set(k, null));
+    ['fx-daily', 'fx-cloud', 'fx-cloud-days', 'fx-synced', 'fx-pushed', 'fx-faces', 'fx-live'].forEach(k => store.set(k, null));
   }
   /* ---------- Daily wins ----------
      Each finished day of Today's challenge has a winner: the top score that day. A tie gives each of them a win, and a player
@@ -801,10 +801,12 @@
     if (flip && !again) { useKey = !useKey; store.set('fx-cloud-key', useKey ? 'yes' : 'no'); return fsCall(method, path, body, true); }
     return out;
   }
+  // A refusal from the database carries its status; a failure with no status means the connection itself failed.
+  const fsErr = (what, r) => { const e = (r.data && r.data.error) || {}; return Object.assign(new Error(`${what} ${r.status} ${e.status || ''} ${String(e.message || '').slice(0, 120)}`.replace(/\s+/g, ' ').trim()), { status: r.status }); };
   async function fsGet(path) {
     const r = await fsCall('GET', `${fsRoot()}/${path}`);
     if (r.status === 404) return null;
-    if (r.status !== 200) throw new Error('read ' + r.status);
+    if (r.status !== 200) throw fsErr('read', r);
     return r.data || {};
   }
   // One write. "Already exists" on a create-only write means an earlier attempt got through, which is as good as done.
@@ -813,7 +815,7 @@
     if (r.status === 200) return 'ok';
     const why = r.data && r.data.error && r.data.error.status;
     if (r.status === 409 || why === 'ALREADY_EXISTS' || (write.currentDocument && why === 'FAILED_PRECONDITION')) return 'exists';
-    throw new Error('write ' + r.status);
+    throw fsErr('write', r);
   }
 
   // Who has played on this device: their names as typed, for the family's list of players.
@@ -835,41 +837,68 @@
     // a challenge played with no connection is still sent for a few days afterwards, so it counts towards that day's win
     const own = store.get('fx-days', {});
     for (let back = 1; back <= LATE; back++) { const date = dayShift(d.date, -back); for (const r of own[date] || []) if (r && r.name && r.t) todo.push([`days/${date}/${pidOf(r.name)}`, `days/${date}/entries/${pidOf(r.name)}`, r]); }
+    let refused = null;
     for (const [id, path, r] of todo) {
       if (done.has(id)) continue;
-      await fsCommit({ update: { name: `${fsRoot()}/families/${f.fid}/${path}`, fields: fsFields({ name: r.name, avatar: r.avatar || '', score: r.score, streak: r.streak || 0, clock: !!r.clock, perfect: !!r.perfect, t: r.t }) }, currentDocument: { exists: false } });
+      try { await fsCommit({ update: { name: `${fsRoot()}/families/${f.fid}/${path}`, fields: fsFields({ name: r.name, avatar: r.avatar || '', score: r.score, streak: r.streak || 0, clock: !!r.clock, perfect: !!r.perfect, t: r.t }) }, currentDocument: { exists: false } }); }
+      catch (e) { if (!e.status) throw e; refused = refused || e; continue; }       // one refused score must not hold back the others
       done.add(id); store.set('fx-synced', { fid: f.fid, ids: [...done].slice(-600) });
     }
+    if (refused) throw refused;
   }
-  // A player's passport, gold stamps and personal bests. Stamps are added to whatever the family's copy already holds, never replaced.
+  /* A player's passport, gold stamps, personal bests and picture. The family's copy and this device's are merged both ways:
+     what the family holds comes down first, and if this device then knows more, the whole merged record goes back up.
+     It is written as one plain document, guarded so that a save from another device in the same moment is never overwritten.
+     (The first version sent "add these to the list" instructions instead; the live database refused those, so nothing here relies on them.) */
   const goldCode = g => [g.t, g.score, g.table, g.clock ? 1 : 0].join('|');
-  async function pushPlayer(f, who) {
-    const pid = pidOf(who.name), mine = stamps(who.name).filter(a => C[a]), gold = perfects(who.name).map(goldCode), bests = ['world', 'known', 'daily'].map(t => [t, bestFor(t, who.name)]);
-    const mark = [who.avatar, mine.length, gold.length, ...bests.map(([, b]) => b.score + '/' + b.streak)].join(':'), sent = kept('fx-pushed', f), was = sent.players || {};
-    if (was[pid] === mark) return;
-    const changes = [];
-    if (mine.length) changes.push({ fieldPath: 'stamps', appendMissingElements: { values: mine.map(fsVal) } });
-    if (gold.length) changes.push({ fieldPath: 'perfect', appendMissingElements: { values: gold.map(fsVal) } });
-    for (const [t, b] of bests) { if (b.score > 0) changes.push({ fieldPath: 'best_' + t, maximum: fsVal(b.score) }); if (b.streak > 0) changes.push({ fieldPath: 'streak_' + t, maximum: fsVal(b.streak) }); }
-    changes.push({ fieldPath: 'updated', setToServerValue: 'REQUEST_TIME' });
-    await fsCommit({ update: { name: `${fsRoot()}/families/${f.fid}/players/${pid}`, fields: fsFields({ name: who.name, avatar: who.avatar || '' }) }, updateMask: { fieldPaths: ['name', 'avatar'] }, updateTransforms: changes });
-    was[pid] = mark; store.set('fx-pushed', { fid: f.fid, players: was });
+  const texts = v => Array.isArray(v) ? v.filter(x => typeof x === 'string') : [];
+  // A player's picture, changed everywhere this device keeps it.
+  function setFace(who, avatar) {
+    const k = plain(who.name), all = store.get('fx-people', {}), last = store.get('fx-player', null);
+    who.avatar = avatar;
+    if (all[k]) { all[k].avatar = avatar; store.set('fx-people', all); }
+    if (last && plain(last.name) === k) store.set('fx-player', Object.assign(last, { avatar }));
+    if (P && plain(P.name) === k) P.avatar = avatar;
   }
-  async function pullPlayer(f, who) {
-    const doc = await fsGet(`families/${f.fid}/players/${encodeURIComponent(pidOf(who.name))}`);
-    if (!doc) return;
-    const d = fsDoc(doc), key = plain(who.name);
-    const all = store.get('fx-passport', {}), have = all[key] || [], extra = (d.stamps || []).filter(a => C[a] && !have.includes(a));
-    if (extra.length) { all[key] = [...have, ...extra]; store.set('fx-passport', all); }
-    const golds = store.get('fx-perfect', {}), mine = golds[key] || [], seen = new Set(mine.map(g => g.t));
-    const more = (d.perfect || []).map(code => { const [t, score, table, clock] = String(code).split('|'); return { t: +t, score: +score, table, clock: clock === '1' }; }).filter(g => g.t && !seen.has(g.t));
-    if (more.length) { golds[key] = [...mine, ...more].sort((a, b) => a.t - b.t); store.set('fx-perfect', golds); }
-    const bests = store.get('fx-bests', {}); let better = false;
-    for (const t of ['world', 'known', 'daily']) {
-      const k = bestKey(t, who.name), prev = bests[k] || { score: 0, streak: 0 }, next = { score: Math.max(prev.score, d['best_' + t] || 0), streak: Math.max(prev.streak, d['streak_' + t] || 0) };
-      if (next.score !== prev.score || next.streak !== prev.streak) { bests[k] = next; better = true; }
+  async function syncPlayer(f, who) {
+    const pid = pidOf(who.name), key = plain(who.name), where = `families/${f.fid}/players/`;
+    for (let tries = 0; tries < 3; tries++) {
+      const doc = await fsGet(where + encodeURIComponent(pid)), d = doc ? fsDoc(doc) : {};
+      const playedHere = stamps(who.name).length > 0 || ['world', 'known', 'daily'].some(t => bestFor(t, who.name).score > 0);
+      // down: stamps, gold stamps and bests the family has and this device does not
+      const all = store.get('fx-passport', {}), have = all[key] || [], extra = texts(d.stamps).filter(a => C[a] && !have.includes(a));
+      if (extra.length) { all[key] = [...have, ...extra]; store.set('fx-passport', all); }
+      const golds = store.get('fx-perfect', {}), mine = golds[key] || [], seen = new Set(mine.map(g => g.t));
+      const more = texts(d.perfect).map(code => { const [t, score, table, clock] = code.split('|'); return { t: +t, score: +score, table, clock: clock === '1' }; }).filter(g => g.t && !seen.has(g.t));
+      if (more.length) { golds[key] = [...mine, ...more].sort((a, b) => a.t - b.t); store.set('fx-perfect', golds); }
+      const bests = store.get('fx-bests', {}); let better = false;
+      for (const t of ['world', 'known', 'daily']) {
+        const k = bestKey(t, who.name), prev = bests[k] || { score: 0, streak: 0 }, next = { score: Math.max(prev.score, d['best_' + t] || 0), streak: Math.max(prev.streak, d['streak_' + t] || 0) };
+        if (next.score !== prev.score || next.streak !== prev.streak) { bests[k] = next; better = true; }
+      }
+      if (better) store.set('fx-bests', bests);
+      // the picture: the family's is taken when this device has not changed its own since the two last agreed,
+      // or when the player has not played here yet (a second device, where the name was typed with whatever picture was showing)
+      const faces = kept('fx-faces', f), agreed = faces.players || {}, last = agreed[pid];
+      if (doc && d.avatar && d.avatar !== who.avatar && (last === undefined ? !playedHere : last === who.avatar)) setFace(who, d.avatar);
+      // up: the merged record, if it holds anything the family's copy does not
+      const want = { name: typeof d.name === 'string' && d.name ? d.name : who.name, avatar: who.avatar || '' };
+      const allStamps = [...new Set([...texts(d.stamps), ...stamps(who.name).filter(a => C[a])])].slice(0, 250), allGold = [...new Set([...texts(d.perfect), ...perfects(who.name).map(goldCode)])].slice(-3000);
+      if (allStamps.length) want.stamps = allStamps;
+      if (allGold.length) want.perfect = allGold;
+      const nums = [];
+      for (const t of ['world', 'known', 'daily']) { const b = bestFor(t, who.name); nums.push(['best_' + t, b.score], ['streak_' + t, b.streak]); }
+      for (const [k, v] of nums) if (v > 0) want[k] = v;
+      const same = doc && want.name === d.name && want.avatar === d.avatar && allStamps.length === (Array.isArray(d.stamps) ? d.stamps.length : 0) && allGold.length === (Array.isArray(d.perfect) ? d.perfect.length : 0) && nums.every(([k, v]) => v === (d[k] || 0));
+      if (!same) {
+        const fields = fsFields(want); fields.updated = { timestampValue: new Date().toISOString() };
+        const done = await fsCommit({ update: { name: `${fsRoot()}/${where}${pid}`, fields }, currentDocument: doc ? { updateTime: doc.updateTime } : { exists: false } });
+        if (done !== 'ok') continue;          // another device saved this player in the same moment: read again and merge again
+      }
+      agreed[pid] = who.avatar; store.set('fx-faces', { fid: f.fid, players: agreed });
+      return;
     }
-    if (better) store.set('fx-bests', bests);
+    throw Object.assign(new Error('write 409 the record kept changing'), { status: 409 });
   }
   const okRow = r => r && typeof r.name === 'string' && r.name && Number.isFinite(r.score) && Number.isFinite(r.t);
   async function pullTables(f) {
@@ -903,21 +932,27 @@
     }
     save();
   }
-  const cloudState = { busy: false, again: false, ok: null, at: 0 };
+  const cloudState = { busy: false, again: false, ok: null, at: 0, problems: [] };
   async function cloudSync() {
     const f = family();
     if (!f) return;
     if (cloudState.busy) { cloudState.again = true; return; }
     cloudState.busy = true;
-    try {
-      const people = localPeople();
-      await pushScores(f);
-      for (const who of people) await pushPlayer(f, who);
-      for (const who of people) await pullPlayer(f, who);
-      await pullTables(f);
-      await pullDays(f, S.screen === 'family' || (S.screen === 'board' && S.tab === 'wins'));
-      cloudState.ok = true;
-    } catch (e) { cloudState.ok = false; }
+    // Each part stands on its own: a passport that will not save must never stop the scores being shared or fetched.
+    // Only a dead connection ends the run early.
+    const problems = []; let offline = false;
+    const part = async (label, job) => {
+      if (offline) return false;
+      try { await job(); return true; }
+      catch (e) { if (e && e.status) problems.push(`${label}: ${e.message}`); else offline = true; return false; }
+    };
+    const people = localPeople();
+    const up = await part('scores', () => pushScores(f));
+    for (const who of people) await part('player ' + pidOf(who.name), () => syncPlayer(f, who));
+    const down = await part('tables', () => pullTables(f));
+    await part('days', () => pullDays(f, S.screen === 'family' || (S.screen === 'board' && S.tab === 'wins')));
+    cloudState.ok = up && down && !offline;                 // scores sent and the family's scores fetched
+    cloudState.problems = offline ? [] : problems.slice(0, 5);
     cloudState.busy = false; cloudState.at = Date.now();
     if (cloudState.again) { cloudState.again = false; return cloudSync(); }
     const typing = document.activeElement && document.activeElement.tagName === 'INPUT';
@@ -929,7 +964,7 @@
     if (!family()) return '';
     if (cloudState.busy && cloudState.ok === null) return 'Fetching your family\'s scores…';
     if (cloudState.ok === false) return 'Could not reach the family scoreboard just now. Scores are saved on this device and will be sent later.';
-    return 'Shared with your family.';
+    return cloudState.problems.length ? 'Scores are shared with your family. Some passport details could not be saved yet.' : 'Shared with your family.';
   }
   addEventListener('online', () => cloudSync());
   document.addEventListener('visibilitychange', () => { if (!document.hidden) cloudSoon(); });
@@ -1242,7 +1277,7 @@
         </div>
         <div class="grid grid-cols-4 gap-3 justify-items-center mt-3" id="fx-hand" role="group" aria-labelledby="fx-hand-label">${viewHand()}</div>
         ${S.claim ? `<div class="fx-tip" style="margin-top:1.25rem" id="fx-claim">
-            <p><b>${esc(S.claim.name)}</b> already plays in your family${S.claim.stamps ? ` (${plural(S.claim.stamps, 'flag')} stamped)` : ''}. Is that you? Saying yes brings that passport and those scores to this device.</p>
+            <p>${S.claim.avatar ? `<span class="fx-ava" style="--s:2.4rem;float:left;margin:.1rem .7rem .2rem 0" aria-hidden="true">${esc(S.claim.avatar)}</span>` : ''}<b>${esc(S.claim.name)}</b> already plays in your family${S.claim.stamps ? ` (${plural(S.claim.stamps, 'flag')} stamped)` : ''}. Is that you? Saying yes brings that picture, passport and those scores to this device.</p>
             <button type="submit" class="fx-go mt-3">Yes, continue as ${esc(S.claim.name)}</button>
             <button type="button" class="fx-quiet block mx-auto mt-2" data-act="claim-no">No, I will use another name</button>
           </div>`
@@ -1264,6 +1299,7 @@
       ${f ? `<p>This device shares its scores with everyone who has entered the same family code.</p>
         <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 mt-4"><dt class="fx-label self-center">Family code</dt><dd class="font-semibold" id="fx-code-shown" style="overflow-wrap:anywhere">${esc(f.code)}</dd></dl>
         <p class="text-sm text-ink-soft mt-3" id="fx-cloud-note" role="status">${cloudNote()}</p>
+        ${cloudState.problems.length ? `<p class="text-sm text-ink-soft mt-2" id="fx-cloud-detail" style="overflow-wrap:anywhere"><b class="font-semibold">Details for troubleshooting:</b><br>${cloudState.problems.map(esc).join('<br>')}</p>` : ''}
         <button class="fx-go mt-5" data-act="family-sync" data-primary>Update now</button>
         <button class="fx-quiet block mx-auto mt-3" data-act="family-leave">${S.confirmLeave ? 'Tap again to leave. Scores stay on this device.' : 'Leave this family'}</button>`
       : `<p>Enter your family's code and this device joins one shared scoreboard: the high scores, today's challenge, and your passport on every device you play on.</p>
@@ -1918,16 +1954,18 @@
     }
     // A name that is new to this device may already belong to someone in the family: ask before taking over their passport.
     const f = family(), known = store.get('fx-people', {})[plain(name)];
-    if (f && !known && !(S.claim && plain(S.claim.name) === plain(name))) {
+    const claimed = S.claim && pidOf(S.claim.name) === pidOf(name) ? S.claim : null;
+    if (f && !known && !claimed) {
       const btn = app.querySelector('#fx-continue');
       if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
       let doc = null;
       try { doc = await fsGet(`families/${f.fid}/players/${encodeURIComponent(pidOf(name))}`); } catch (e) { /* offline: carry on, the device catches up later */ }
       if (S.screen !== 'start') return;
-      if (doc) { const d = fsDoc(doc); S.name = name; S.claim = { name: d.name || name, stamps: (d.stamps || []).length }; return render(false); }
+      if (doc) { const d = fsDoc(doc); S.name = name; S.claim = { name: d.name || name, avatar: typeof d.avatar === 'string' ? d.avatar : '', stamps: (d.stamps || []).length }; return render(false); }
     }
-    choosePlayer(name, S.avatar);
-    S.name = name; S.claim = null; openRules(); go(); cloudSync();
+    if (claimed) choosePlayer(claimed.name, claimed.avatar || S.avatar);      // the player as the family knows them: same spelling, same picture
+    else choosePlayer(name, S.avatar);
+    S.name = P.name; S.claim = null; openRules(); go(); cloudSync();
   });
   async function joinFamily() {
     const input = app.querySelector('#fx-code'), err = app.querySelector('#fx-code-err'), btn = app.querySelector('#fx-join-btn'), code = cleanCode(input.value);
@@ -1979,7 +2017,7 @@
     if (act === 'family-sync') { cloudState.ok = null; cloudSync(); return render(false); }
     if (act === 'family-leave') {
       if (!S.confirmLeave) { S.confirmLeave = true; return render(false); }
-      ['fx-family', 'fx-cloud', 'fx-cloud-days', 'fx-synced', 'fx-pushed'].forEach(k => store.set(k, null)); S.confirmLeave = false; cloudState.ok = null;
+      ['fx-family', 'fx-cloud', 'fx-cloud-days', 'fx-synced', 'fx-pushed', 'fx-faces'].forEach(k => store.set(k, null)); S.confirmLeave = false; cloudState.ok = null;
       return render(false);
     }
     if (act === 'claim-no') { S.claim = null; S.name = ''; render(false); app.querySelector('#fx-name').focus(); return; }
