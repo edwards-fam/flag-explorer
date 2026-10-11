@@ -504,7 +504,7 @@
   const rankFor = score => RANKS.find(r => score >= r[0])[1];
 
   /* ---------- Sound and celebration ---------- */
-  let muted = store.get('fx-mute', false), ac = null, master = null, keepAlive = null;
+  let muted = store.get('fx-mute', false), ac = null, master = null, keepAlive = null, stale = false, beat = null;
   const IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform || ''));      // iPhone and iPad
   function audio() {
     if (muted) return null;
@@ -532,11 +532,20 @@
   // Two ways to ask for them to be treated as media instead: the audio-session setting where the device offers it, otherwise a silent clip kept playing.
   function wake() {
     if (muted) return;
-    audio();
+    let session = false;
     try {
-      if (navigator.audioSession) { if (navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; return; }
+      if (navigator.audioSession) { if (navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; session = true; }
     } catch (e) { /* not allowed here: fall through to the clip */ }
-    if (!IOS) return;
+    // Sound that has been through the background is rebuilt, not revived. After another app has been in front, an iPhone
+    // can hand the old sound engine back looking "running" while it plays nothing, so the first touch on return makes a new one.
+    if (ac) {
+      const stuck = ac.state === 'running' && beat && performance.now() - beat.at > 600 && ac.currentTime - beat.ct < .05;
+      if (stale || stuck || ac.state === 'closed' || ac.state === 'interrupted') { try { ac.close(); } catch (e) { /* already gone */ } ac = null; master = null; }
+    }
+    stale = false;
+    const a = audio();
+    beat = a ? { at: performance.now(), ct: a.currentTime } : null;
+    if (session || !IOS) return;
     try {
       if (!keepAlive) {
         const bytes = silentWav();
@@ -559,7 +568,8 @@
     try { if (navigator.audioSession && navigator.audioSession.type === 'playback') navigator.audioSession.type = 'auto'; } catch (e) { /* leave it */ }
   };
   ['touchend', 'click', 'keydown'].forEach(t => document.addEventListener(t, wake, { capture: true, passive: true }));
-  document.addEventListener('visibilitychange', () => { if (document.hidden) hush(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { hush(); stale = true; } });
+  addEventListener('pageshow', ev => { if (ev.persisted) stale = true; });
   function note(freq, at, dur, type, vol, slideTo) {
     const a = audio(); if (!a) return;
     try {

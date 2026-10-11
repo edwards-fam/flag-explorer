@@ -44,4 +44,25 @@ const out = [];
   await p.tap('[data-act=mute]'); out.push('after sound on: ' + await p.evaluate(() => navigator.audioSession.type));
   out.push('errors: ' + (errs.join(' | ') || 'none'));
 }
+// D: another app comes to the front and the player returns: the next touch must build a new sound engine that really plays
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 760 } }); const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
+  await p.goto(url); await p.fill('#fx-name', 'Alex'); await p.click('#fx-setup [type=submit]'); await p.click('[data-act=opt][data-k=mode][data-v=free]'); await p.waitForTimeout(200);
+  await p.evaluate(() => { window.__first = window.__fx.sound.ac; });
+  const away = hidden => p.evaluate(h => { Object.defineProperty(document, 'hidden', { value: h, configurable: true }); document.dispatchEvent(new Event('visibilitychange')); }, hidden);
+  await away(true); await p.waitForTimeout(100); await away(false);
+  await p.click('[data-act=opt][data-k=pool][data-v=known]'); await p.waitForTimeout(100);
+  out.push('after returning from another app: new sound engine ' + await p.evaluate(() => window.__fx.sound.ac !== window.__first) + ', old one ' + await p.evaluate(() => window.__first.state) + ', new one ' + await p.evaluate(() => window.__fx.sound.ac.state));
+  await p.evaluate(() => { const s = window.__fx.sound; window.__an = s.ac.createAnalyser(); window.__an.fftSize = 2048; s.master.connect(window.__an); window.__peak = 0;
+    const buf = new Float32Array(2048); setInterval(() => { window.__an.getFloatTimeDomainData(buf); for (const x of buf) window.__peak = Math.max(window.__peak, Math.abs(x)); }, 10); });
+  await p.click('[data-act=opt][data-k=pool][data-v=world]'); await p.waitForTimeout(400);
+  out.push('and a tap on it is audible: peak level ' + (await p.evaluate(() => window.__peak)).toFixed(3));
+  await p.evaluate(() => { window.__second = window.__fx.sound.ac; }); await p.click('[data-act=opt][data-k=clock][data-v=true]'); await p.waitForTimeout(100);
+  out.push('without leaving, the same engine is kept: ' + await p.evaluate(() => window.__fx.sound.ac === window.__second));
+  // a sound engine that claims to run but whose clock has stopped is also replaced
+  await p.waitForTimeout(700); await p.evaluate(() => { const real = window.__fx.sound.ac; window.__frozen = real.currentTime; Object.defineProperty(real, 'currentTime', { get: () => window.__frozen }); });
+  await p.click('[data-act=opt][data-k=clock][data-v=false]'); await p.waitForTimeout(800); await p.click('[data-act=opt][data-k=clock][data-v=true]'); await p.waitForTimeout(100);
+  out.push('a stalled engine is replaced: ' + await p.evaluate(() => window.__fx.sound.ac !== window.__second));
+  out.push('errors: ' + (errs.join(' | ') || 'none'));
+}
 console.log(out.join('\n')); await browser.close();
