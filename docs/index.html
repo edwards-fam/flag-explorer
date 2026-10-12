@@ -287,8 +287,9 @@
   .fx-hrow.top .fx-hrank { color: var(--ochre); }
   .fx-hrow.hot { background: var(--gold-tint); border-radius: 10px; }
   .fx-hrow.empty { color: var(--ink-soft); }
-  .fx-day { display: grid; grid-template-columns: 5.4rem minmax(0, 1fr) auto; align-items: baseline; column-gap: .65rem; padding: .4rem .5rem; }
-  .fx-day + .fx-day { border-top: 1px solid var(--rule); }
+  .fx-day { display: grid; width: 100%; grid-template-columns: 5.4rem minmax(0, 1fr) auto; align-items: baseline; column-gap: .65rem; padding: .45rem .5rem; text-align: left; color: inherit; background: none; border-radius: 10px; }
+  #fx-days li + li { border-top: 1px solid var(--rule); }
+  .fx-day[aria-pressed="true"] { background: var(--gold-tint); }
 
   /* Game choices on the second screen */
   .fx-mode {
@@ -1382,6 +1383,25 @@
     </main>`;
   }
 
+  // A finished day for the family group chat: the winner, everyone's score that day, and the month's points table.
+  const MEDALS = ['🥇', '🥈', '🥉'];
+  function dayText(date, book = daysBook()) {
+    const rows = [...(book.get(date) || [])].sort((a, b) => b.score - a.score || a.t - b.t), won = dayWinners(rows);
+    let place = 0;
+    const lines = rows.map((r, i) => { if (!i || r.score !== rows[i - 1].score) place = i + 1; return `${MEDALS[place - 1] || place + '.'} ${r.avatar} ${r.name} ${fmt(r.score)}`; });
+    const names = won.map(r => r.name), month = date.slice(0, 7), monthName = MONTH_NAMES[+month.slice(5) - 1];
+    const head = won.length > 1 ? `🏆 ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]} tie for the win with ${fmt(won[0].score)}!` : `🏆 ${names[0]} wins with ${fmt(won[0].score)}!`;
+    const sofar = book.size ? [...book.keys()].filter(k => k.startsWith(month) && k <= date) : [];
+    const pts = winsTable(month, new Map([...book].filter(([k]) => sofar.includes(k))), 'points');
+    const board = pts.slice(0, 10).map(e => `${e.place}. ${e.avatar} ${e.name} ${fmt(e.points)}`);
+    if (pts.length > 10) board.push(`…and ${plural(pts.length - 10, 'more player')}`);
+    const monthOver = todayKey().slice(0, 7) > month, lastHere = sofar[sofar.length - 1] === date && ![...book.keys()].some(k => k.startsWith(month) && k > date);
+    const span = monthOver && lastHere ? ', final' : !monthOver && lastHere ? ' so far' : ` up to ${dayLabel(date).replace(/^[A-Za-z]+ /, '')}`;
+    const link = /^https:$/.test(location.protocol) ? location.href.split(/[?#]/)[0] : '';
+    return [`🌍 Flag Explorer · Today's challenge`, dayLabel(date), '', head, '', ...lines, '', `📊 ${monthName} points${span}`, ...board,
+      ...(link ? ['', `Play today's flags: ${link}`] : [])].join('\n');
+  }
+
   // The daily wins: who has won Today's challenge most often, this month and since the start
   const nameList = list => { const n = list.map(e => esc(e.name)); return n.length < 3 ? n.join(' and ') : n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1]; };
   function viewWins() {
@@ -1400,8 +1420,14 @@
     // last month's result stays in view while the new month is young
     const before = dayShift(month + '-01', -1).slice(0, 7), past = all ? [] : winsTable(before, book, by).filter(e => e.place === 1);
     const lastMonth = past.length ? `${MONTH_NAMES[+before.slice(5) - 1]} went to ${nameList(past)} with ${count(past[0])}${past.length > 1 ? ' each' : ''}.` : '';
+    const days = [...book.keys()], pickDay = days.includes(S.shareDay) ? S.shareDay : days[days.length - 1];
     const recent = [...book].slice(-7).reverse().map(([date, day]) => { const won = dayWinners(day);
-      return `<li class="fx-day"><span class="fx-label">${dayLabel(date)}</span><span class="fx-clip whitespace-nowrap min-w-0">${won.map(r => `<span aria-hidden="true">${esc(r.avatar)}</span> ${esc(r.name)}`).join(' · ')}</span><span class="fx-num">${fmt(won[0].score)}</span></li>`; }).join('');
+      return `<li><button type="button" class="fx-day" data-act="share-day" data-v="${date}" aria-pressed="${date === pickDay}"><span class="fx-label">${dayLabel(date)}</span><span class="fx-clip whitespace-nowrap min-w-0">${won.map(r => `<span aria-hidden="true">${esc(r.avatar)}</span> ${esc(r.name)}`).join(' · ')}</span><span class="fx-num">${fmt(won[0].score)}</span></button></li>`; }).join('');
+    const share = pickDay ? `<p class="fx-label mt-6" id="fx-share-l">Share with the family</p>
+      <p class="text-sm text-ink-soft mt-1">The results for <b class="font-semibold" id="fx-share-day">${dayLabel(pickDay)}</b>, ready to paste into a text. Tap a day above to choose another.</p>
+      <button class="fx-go mt-3" data-act="copy-day" data-v="${pickDay}" id="fx-copy-day">Copy results</button>
+      ${navigator.share ? `<button class="fx-quiet block mx-auto mt-3" data-act="send-day" data-v="${pickDay}">Send with another app</button>` : ''}
+      <pre class="fx-share mt-3" id="fx-day-share" aria-labelledby="fx-share-l">${esc(dayText(pickDay, book))}</pre>` : '';
     const pick = (act, on, v, label) => `<button type="button" class="fx-pick" data-act="${act}" data-v="${v}" aria-pressed="${on}">${label}</button>`;
     return `<div class="grid grid-cols-2 gap-x-2 mt-5">
         <p class="fx-label" id="fx-span-l">Standings for</p><p class="fx-label" id="fx-rank-l">Rank by</p>
@@ -1413,6 +1439,7 @@
       <p class="font-script text-lg text-center mt-4" id="fx-wins-foot">${foot}</p>
       ${lastMonth ? `<p class="text-sm text-center mt-1" id="fx-wins-last">${lastMonth}</p>` : ''}
       ${recent ? `<p class="fx-label mt-6">Recent winners</p><ul class="mt-1" id="fx-days">${recent}</ul>` : ''}
+      ${share}
       ${family() ? `<p class="text-sm text-ink-soft text-center mt-4" id="fx-cloud-note" role="status">${cloudNote()}</p>` : ''}
       <p class="text-sm text-ink-soft text-center mt-2" id="fx-wins-key">${byPoints
         ? `Points add up every score in Today's challenge, so every day played counts. Only the first try each day is scored. Today's score is added at midnight.`
@@ -1988,15 +2015,15 @@
     if (S.screen === 'family') render(false);
   }
 
-  function copyResult(btn) {
-    const text = shareText();
+  function copyText(btn, text, box) {
     const select = () => {      // some app views refuse the clipboard: select the text so it can be copied by hand
       const r = document.createRange(), sel = window.getSelection();
-      r.selectNodeContents(app.querySelector('#fx-share')); sel.removeAllRanges(); sel.addRange(r);
+      r.selectNodeContents(app.querySelector(box)); sel.removeAllRanges(); sel.addRange(r);
       btn.textContent = 'Selected: now copy it';
     };
     try { navigator.clipboard.writeText(text).then(() => { btn.textContent = 'Copied'; }, select); } catch (e) { select(); }
   }
+  const copyResult = btn => copyText(btn, shareText(), '#fx-share');
 
   app.addEventListener('click', ev => {
     const el = ev.target.closest('[data-act]');
@@ -2005,6 +2032,9 @@
     if (act === 'avatar') return setAvatar(el.dataset.e);
     if (act === 'shuffle') { S.hand = dealHand(); app.querySelector('#fx-hand').innerHTML = viewHand(); return; }
     if (act === 'copy') return copyResult(el);
+    if (act === 'copy-day') return copyText(el, dayText(el.dataset.v), '#fx-day-share');
+    if (act === 'send-day') { navigator.share({ text: dayText(el.dataset.v) }).catch(() => {}); return; }
+    if (act === 'share-day') { S.shareDay = el.dataset.v; SFX.tap(); return render(false); }
     if (act === 'text') { bigText = !bigText; store.set('fx-text', bigText); applyText(); SFX.tap(); return render(false); }
     if (act === 'mute') { muted = !muted; store.set('fx-mute', muted); if (muted) hush(); else { wake(); SFX.right(); } return render(false); }
     if (act === 'opt') {

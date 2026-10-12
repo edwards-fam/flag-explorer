@@ -81,6 +81,22 @@ await L.screenshot({ path: 'v6-points-all.png', fullPage: true }); await overflo
 await L.click('[data-act=span][data-v=month]'); eq((await txt(L, '#fx-wins-last')).trim(), 'September went to Casey with 1,500 points.', 'last month by points');
 await L.click('[data-act=back]'); await L.click('[data-act=board]'); await L.click('[data-act=tab][data-v=wins]'); eq(await L.locator('[data-act=rank][data-v=points][aria-pressed=true]').count(), 1, 'the choice of ranking is remembered');
 await L.click('[data-act=rank][data-v=wins]'); await L.click('[data-act=span][data-v=all]');
+// the family summary of a finished day, for a group text
+const day12 = await L.evaluate(() => window.__fx.dayText('2026-10-12'));
+assert(day12.includes('🏆 Alex and Robin tie for the win with 900!'), 'a tied day names both winners');
+assert(day12.includes('🥇 🦊 Alex 900\n🥇 🦊 Robin 900'), 'tied scores share the gold');
+assert(day12.includes('📊 October points up to 12 Oct\n1. 🦊 Alex 900\n1. 🦊 Robin 900'), 'points as they stood that day');
+const day14 = await L.evaluate(() => window.__fx.dayText('2026-10-14'));
+assert(day14.includes('🏆 Alex wins with 1,680!') && day14.includes('🥈') && day14.includes('📊 October points so far'), 'the latest day: winner, places and points so far');
+assert(day14.includes(`Robin ${(1200 + rScore).toLocaleString('en-US')}`) && day14.includes('Alex 2,580'), 'the month’s points to that day');
+assert(!day14.includes('http'), 'no link when the game is not on its web address');
+assert((await L.evaluate(() => window.__fx.dayText('2026-09-30'))).includes('📊 September points, final'), 'a finished month says final');
+assert((await txt(L, '#fx-day-share')).includes('Wed 14 Oct'), 'the share box starts on the latest finished day');
+await L.click('#fx-days [data-v="2026-10-12"]'); eq(await L.locator('#fx-days [data-v="2026-10-12"][aria-pressed=true]').count(), 1, 'tapping a day chooses it');
+assert((await txt(L, '#fx-day-share')).includes('tie for the win'), 'and the share box follows'); eq((await txt(L, '#fx-share-day')).trim(), 'Mon 12 Oct', 'the chosen day is named');
+await L.context().grantPermissions(['clipboard-read', 'clipboard-write']); await L.click('#fx-copy-day'); await L.waitForTimeout(300);
+eq((await txt(L, '#fx-copy-day')).trim(), 'Copied', 'Copy results copies'); eq(await L.evaluate(() => navigator.clipboard.readText()), await L.evaluate(() => window.__fx.dayText('2026-10-12')), 'exactly the day’s summary');
+await L.screenshot({ path: 'v7-share-day.png', fullPage: true }); await overflow(L, 'share day');
 eq(await L.locator('#fx-wins-last').count(), 0, 'no last-month line on the all-time view'); eq((await L.locator('#fx-wins .fx-hrank').allTextContents()).join(), '1st,1st,3rd', 'places on the all-time view');
 await L.screenshot({ path: 'v3-wins-all.png', fullPage: true }); await overflow(L, 'wins all');
 // starting fresh clears the wins too
