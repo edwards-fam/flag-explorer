@@ -362,9 +362,6 @@
 
 <div class="mx-auto max-w-5xl px-4 py-4 sm:py-6">
   <div id="app"></div>
-  <p class="fx-label mt-5 text-center" style="text-transform:none;letter-spacing:.02em">
-    Flag artwork: public-domain drawings from the country-flags project. Country facts: mledoze/countries. Population: World Bank, 2025.
-  </p>
 </div>
 
 <script>window.FX_DATA = /*__DATA__*/null;</script>
@@ -1252,6 +1249,8 @@
       </form>
       ${CLOUD && !family() ? `<p class="fx-tip" style="margin-top:1rem" id="fx-family-tip"><b>Playing with family?</b> <button type="button" class="underline font-semibold" data-act="family">Enter your family code</button> to share one scoreboard.</p>` : ''}
       <div class="flex flex-wrap justify-center gap-x-7 mt-3"><button type="button" class="fx-quiet" data-act="board">High scores</button>${family() ? `<button type="button" class="fx-quiet" data-act="family">Family scoreboard on</button>` : ''}${textBtn()}</div>
+      <button type="button" class="fx-quiet block mx-auto mt-4" style="opacity:.75" data-act="credits" aria-expanded="${!!S.credits}" aria-controls="fx-credits">Credits</button>
+      ${S.credits ? `<p class="text-sm text-ink-soft text-center mt-2" id="fx-credits">Flag artwork: public-domain drawings from the country-flags project. Contains information from mledoze/countries, made available under the Open Database License (ODbL). Population: World Bank, 2025, CC BY 4.0.</p>` : ''}
     </main>`;
   }
 
@@ -1994,6 +1993,7 @@
     if (act === 'avatar') return setAvatar(el.dataset.e);
     if (act === 'shuffle') { S.hand = dealHand(); app.querySelector('#fx-hand').innerHTML = viewHand(); return; }
     if (act === 'copy') return copyResult(el);
+    if (act === 'credits') { S.credits = !S.credits; return render(false); }
     if (act === 'copy-day') return copyText(el, dayText(el.dataset.v), '#fx-day-share');
     if (act === 'send-day') { navigator.share({ text: dayText(el.dataset.v) }).catch(() => {}); return; }
     if (act === 'share-day') { S.shareDay = el.dataset.v; SFX.tap(); return render(false); }
