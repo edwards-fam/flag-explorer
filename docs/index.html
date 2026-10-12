@@ -241,6 +241,12 @@
   }
   .fx-perfect svg { display: inline-block; vertical-align: .06em; }
   .fx-gold-star { display: inline-block; flex: none; vertical-align: -.15em; }
+  /* Passport milestones on the results screen */
+  .fx-feat { margin-top: 1.1rem; padding: .85rem 1rem .9rem; border: 2px solid var(--gold); border-radius: 14px; background: var(--gold-tint); animation: fx-seal .4s cubic-bezier(.2, 1.4, .4, 1) both; }
+  .fx-feat h2 { font-family: var(--font-display); font-weight: 700; font-size: 1.55rem; line-height: 1.05; letter-spacing: .03em; text-transform: uppercase; color: var(--ochre); }
+  .fx-feat.big { padding: 1.1rem 1.15rem 1.15rem; border-width: 3px; }
+  .fx-feat.big h2 { font-size: clamp(1.9rem, 9vw, 2.6rem); margin-top: .2rem; }
+  .fx-feat p { margin-top: .4rem; font-size: .95rem; line-height: 1.4; }
 
   /* Result stamp */
   .fx-stamp {
@@ -334,6 +340,14 @@
   .pp-cover-t { font-family: var(--pp-serif); font-weight: 600; font-size: clamp(1.5rem, 8.4vw, 2.1rem); letter-spacing: .18em; text-indent: .18em; text-transform: uppercase; line-height: 1; }
   .pp-cover-b { font-family: var(--pp-serif); font-style: italic; font-size: clamp(1.35rem, 7.4vw, 1.8rem); line-height: 1.15; }
   .pp-emblem { width: 52%; height: auto; filter: drop-shadow(0 1px 0 rgba(0, 0, 0, .45)); }
+  /* A full passport turns gold */
+  .pp-cover.gold { --pp-navy: #D9BA6C; color: #1B2947; text-shadow: 0 1px 0 rgba(255, 255, 255, .35);
+    background: radial-gradient(120% 90% at 30% 15%, rgba(255, 255, 255, .4), transparent 60%), linear-gradient(90deg, rgba(0, 0, 0, .22) 0, transparent 6%), linear-gradient(140deg, #ECD493, #B88D3C); }
+  .pp-cover.gold .pp-emblem { filter: drop-shadow(0 1px 0 rgba(255, 255, 255, .4)); }
+  .pp-cover small { display: block; margin-top: .45rem; font-family: var(--font-data); font-style: normal; font-weight: 600; font-size: .6rem; letter-spacing: .16em; text-transform: uppercase; }
+  .pp-stamp { position: relative; }
+  .pp-xs { position: absolute; top: 3%; right: 11%; font-size: 1rem; line-height: 1; color: var(--pp-ink-gold); transform: rotate(calc(-1 * var(--r))); }
+  .pp-done { color: var(--pp-ink-gold); }
   .pp-page {
     display: flex; flex-direction: column; height: 100%; padding: 6% 6.5% 4.5%; color: var(--pp-ink); font-family: var(--font-data); text-align: left;
     background: repeating-radial-gradient(circle at 18% 28%, rgba(52, 84, 140, .08) 0 1px, transparent 1px 9px),
@@ -695,11 +709,11 @@
   }
   // Starting fresh: everything this device has recorded about play (scores, today's result, personal bests, passports and
   // gold stamps). Settings stay. Offered only while the device is outside a family, because shared scores cannot be taken back.
-  const RECORDS = ['fx-tables', 'fx-bests', 'fx-perfect', 'fx-passport', 'fx-days'];
+  const RECORDS = ['fx-tables', 'fx-bests', 'fx-perfect', 'fx-passport', 'fx-days', 'fx-expert', 'fx-marks'];
   const anyRecords = () => dailyData().rows.length > 0 || RECORDS.some(k => Object.values(store.get(k, {}) || {}).some(v => v && (v.length || v.score)));
   function wipeRecords() {
     [...RECORDS, 'fx-people'].forEach(k => store.set(k, {}));
-    ['fx-daily', 'fx-cloud', 'fx-cloud-days', 'fx-synced', 'fx-pushed', 'fx-faces', 'fx-live'].forEach(k => store.set(k, null));
+    ['fx-daily', 'fx-cloud', 'fx-cloud-days', 'fx-cloud-people', 'fx-synced', 'fx-pushed', 'fx-faces', 'fx-live'].forEach(k => store.set(k, null));
   }
   /* ---------- Daily wins ----------
      Each finished day of Today's challenge has a winner: the top score that day. A tie gives each of them a win, and a player
@@ -763,6 +777,42 @@
     if (list.includes(a2)) return false;
     all[k] = [...list, a2]; store.set('fx-passport', all);
     return true;
+  }
+  /* The finish lines. A continent is complete when every one of its flags is stamped, the passport when all of them are.
+     After that comes the expert passport: each flag named with no hints earns a gold star on its stamp. */
+  const CONT_CODES = CONTS.map((_, ci) => POOL.filter(a => C[a].cont === ci));
+  const experts = name => store.get('fx-expert', {})[plain(name)] || [];
+  const passportDone = name => { const have = new Set(stamps(name)); return POOL.every(a => have.has(a)); };
+  function addExpert(a2) {
+    if (!passportDone(P.name)) return false;
+    const all = store.get('fx-expert', {}), k = plain(P.name), list = all[k] || [];
+    if (list.includes(a2)) return false;
+    all[k] = [...list, a2]; store.set('fx-expert', all);
+    return true;
+  }
+  // Milestones reached, each kept with the moment it was reached: 'c0' to 'c5' for the continents, 'world', 'expert'.
+  const headline = keys => keys.includes('world') || keys.includes('expert') ? keys.filter(k => k[0] !== 'c') : keys;
+  const featName = key => key === 'world' ? 'the passport' : key === 'expert' ? 'the Expert passport' : CONTS[+key.slice(1)];
+  const marks = name => store.get('fx-marks', {})[plain(name)] || {};
+  function achieved(name) {
+    const have = new Set(stamps(name)), ex = new Set(experts(name)), out = [];
+    CONT_CODES.forEach((codes, ci) => { if (codes.every(a => have.has(a))) out.push('c' + ci); });
+    if (POOL.every(a => have.has(a))) out.push('world');
+    if (POOL.every(a => ex.has(a))) out.push('expert');
+    return out;
+  }
+  function newMarks(name, t = Date.now()) {
+    const all = store.get('fx-marks', {}), k = plain(name), mine = Object.assign({}, all[k] || {}), fresh = achieved(name).filter(m => !mine[m]);
+    if (fresh.length) { fresh.forEach(m => { mine[m] = t; }); all[k] = mine; store.set('fx-marks', all); }
+    return fresh;
+  }
+  // Milestones travel with the family's copy of a player as 'm|key|time'; expert stars as 'x|code'.
+  const readMarks = codes => { const out = {}; for (const c of codes) { const [tag, k, t] = c.split('|'); if (tag === 'm' && k && +t > 0 && (!out[k] || +t < out[k])) out[k] = +t; } return out; };
+  // The last stretch: the flags a player still needs for the next finish line. Within 20 of it, free play deals them more often.
+  const LAST_STRETCH = 20, LEAN = 3;
+  function stillMissing(name) {
+    const have = new Set(passportDone(name) ? experts(name) : stamps(name));
+    return POOL.filter(a => !have.has(a));
   }
 
   /* ---------- The family scoreboard (hosted version only) ----------
@@ -872,6 +922,12 @@
     const golds = store.get('fx-perfect', {}), mine = golds[key] || [], seen = new Set(mine.map(g => g.t));
     const more = texts(d.perfect).map(code => { const [t, score, table, clock] = code.split('|'); return { t: +t, score: +score, table, clock: clock === '1' }; }).filter(g => g.t && !seen.has(g.t));
     if (more.length) { golds[key] = [...mine, ...more].sort((a, b) => a.t - b.t); store.set('fx-perfect', golds); }
+    const codes = texts(d.perfect), exAll = store.get('fx-expert', {}), exMine = exAll[key] || [], exMore = codes.filter(c => c.startsWith('x|')).map(c => c.slice(2)).filter(a => C[a] && !exMine.includes(a));
+    if (exMore.length) { exAll[key] = [...exMine, ...exMore]; store.set('fx-expert', exAll); }
+    const theirs = readMarks(codes), mkAll = store.get('fx-marks', {}), mk = Object.assign({}, mkAll[key] || {}); let mkMore = false;
+    for (const [k, t] of Object.entries(theirs)) if (!mk[k] || t < mk[k]) { mk[k] = t; mkMore = true; }
+    if (mkMore) { mkAll[key] = mk; store.set('fx-marks', mkAll); }
+    newMarks(who.name);                         // a milestone the stamps from two devices reach together
     const bests = store.get('fx-bests', {}); let better = false;
     for (const t of ['world', 'known', 'daily']) {
       const k = bestKey(t, who.name), prev = bests[k] || { score: 0, streak: 0 }, next = { score: Math.max(prev.score, d['best_' + t] || 0), streak: Math.max(prev.streak, d['streak_' + t] || 0) };
@@ -884,7 +940,7 @@
     if (doc && d.avatar && d.avatar !== who.avatar && (last === undefined ? !playedHere : last === who.avatar)) setFace(who, d.avatar);
     // up: only if this device holds something the family's copy does not
     const want = { name: typeof d.name === 'string' && d.name ? d.name : who.name, avatar: who.avatar || '' };
-    const allStamps = [...new Set([...texts(d.stamps), ...stamps(who.name).filter(a => C[a])])].slice(0, 250), allGold = [...new Set([...texts(d.perfect), ...perfects(who.name).map(goldCode)])].slice(-3000);
+    const allStamps = [...new Set([...texts(d.stamps), ...stamps(who.name).filter(a => C[a])])].slice(0, 250), allGold = [...new Set([...texts(d.perfect), ...perfects(who.name).map(goldCode), ...experts(who.name).map(a => 'x|' + a), ...Object.entries(marks(who.name)).map(([k, t]) => `m|${k}|${t}`)])].slice(-3000);
     if (allStamps.length) want.stamps = allStamps;
     if (allGold.length) want.perfect = allGold;
     const nums = [];
@@ -933,6 +989,14 @@
     }
     save();
   }
+  // Everyone in the family and the milestones they have reached, for the day summary. Looked at every few minutes at most.
+  async function pullPeople(f, keen) {
+    const cache = kept('fx-cloud-people', f), age = Date.now() - (cache.at || 0);
+    if (cache.list && age >= 0 && age < (keen ? 20000 : 300000)) return;
+    const res = await fsGet(`families/${f.fid}/players?pageSize=100`);
+    const list = ((res && res.documents) || []).map(fsDoc).filter(d => typeof d.name === 'string' && d.name).map(d => ({ name: d.name, avatar: typeof d.avatar === 'string' ? d.avatar : '', marks: readMarks(texts(d.perfect)) }));
+    store.set('fx-cloud-people', { fid: f.fid, at: Date.now(), list });
+  }
   const cloudState = { busy: false, again: false, ok: null, at: 0, problems: [] };
   async function cloudSync() {
     const f = family();
@@ -951,7 +1015,9 @@
     const up = await part('scores', () => pushScores(f));
     for (const who of people) await part('player ' + pidOf(who.name), () => syncPlayer(f, who));
     const down = await part('tables', () => pullTables(f));
-    await part('days', () => pullDays(f, S.screen === 'family' || (S.screen === 'board' && S.tab === 'wins')));
+    const keen = S.screen === 'family' || (S.screen === 'board' && S.tab === 'wins');
+    await part('days', () => pullDays(f, keen));
+    await part('people', () => pullPeople(f, keen));
     cloudState.ok = up && down && !offline;                 // scores sent and the family's scores fetched
     cloudState.problems = offline ? [] : problems.slice(0, 5);
     cloudState.busy = false; cloudState.at = Date.now();
@@ -1036,7 +1102,9 @@
       rand = seeded(hashStr('flag-explorer ' + todayKey()));
       codes = shuffle([...shuffle(POOLS.known.codes).slice(0, 5), ...shuffle(POOL.filter(a => !KNOWN.has(a))).slice(0, 5)]);
     } else {
-      codes = deck(POOLS[O.pool].codes, ROUND).slice(0, ROUND);
+      const pool = POOLS[O.pool].codes, missing = stillMissing(P.name);
+      const lean = missing.length && missing.length <= LAST_STRETCH ? shuffle(missing.filter(a => pool.includes(a))).slice(0, LEAN) : [];
+      codes = shuffle([...lean, ...deck(pool.filter(a => !lean.includes(a)), ROUND).slice(0, ROUND - lean.length)]);
       markSeen(codes);
     }
     const round = buildRound(codes);
@@ -1048,7 +1116,7 @@
   // One player's round. A player new to this device gets a single tip on their first flag.
   function roundState(round, name, more) {
     return Object.assign({ screen: 'play', mode: 'free', table: O.pool, clock: !!O.clock, practice: false, round, i: 0, score: 0, streak: 0, topStreak: 0, log: [], q: null,
-      confirmEnd: false, newBest: false, newStamps: 0, place: 0, entryT: 0, perfect: false, tip: !store.get('fx-tipped', []).includes(plain(name)) }, more);
+      confirmEnd: false, newBest: false, newStamps: 0, newExpert: 0, feats: [], place: 0, entryT: 0, perfect: false, tip: !store.get('fx-tipped', []).includes(plain(name)) }, more);
   }
 
   /* ---------- Pass and play: two to eight players on one device, one flag a turn ---------- */
@@ -1096,7 +1164,7 @@
   function endMatch() {
     for (const seat of M.seats) { S = seat.S; P = seat.P; closeRound(); S.q = null; S.done = true; S.screen = 'match'; }
     M.over = true; M.turn = 0; S = M.seats[0].S; P = M.seats[0].P; cloudSync();
-    if (M.seats.some(seat => seat.S.perfect)) { SFX.perfect(); confetti(true); }
+    if (M.seats.some(seat => seat.S.perfect || (seat.S.feats || []).length)) { SFX.perfect(); confetti(true); }
     else if (Math.max(...M.seats.map(seat => seat.S.score)) > 0) { SFX.fanfare(); confetti(); } else SFX.finish();
   }
   // Best score first; players level on points share a place.
@@ -1142,6 +1210,7 @@
     S.log.push(e);
     S.score += e.pts + e.streakPts + e.speedPts + e.wagerPts;
     if (ok && !S.practice && addStamp(q.a2)) S.newStamps++;
+    if (ok && !q.hints.length && !S.practice && addExpert(q.a2)) S.newExpert++;
     q.phase = 'result';
     if (!ok) { if (e.timedOut) SFX.timeout(); else SFX.wrong(); if (q.wager) SFX.wagerLose(); }
     else { SFX.right(); if (q.wager) SFX.wagerWin(); else if (e.streakPts && STREAK.some(t => t[0] === S.streak)) SFX.streak(S.streak); }
@@ -1182,13 +1251,14 @@
       const at = list ? tableRows(S.table).findIndex(r => r.t === t && plain(r.name) === plain(P.name)) : -1;      // the place counts the family's scores too
       if (at >= 0 && at < 10 && S.score > 0) { S.place = at + 1; S.entryT = t; }
     }
+    S.feats = S.practice ? [] : newMarks(P.name);
   }
   function finish() {
     closeRound(); cloudSync();
     S.screen = 'end'; S.q = null;
     const t = totals(S.log);
     // Celebration waits for the results screen, after the last answer of the round (bonus question included).
-    if (S.perfect) { SFX.perfect(); confetti(true); }
+    if (S.perfect || S.feats.length) { SFX.perfect(); confetti(true); }
     else if (S.score > 0 && (S.place === 1 || t.named === S.round.length || S.newBest || t.wager > 0)) { SFX.fanfare(); confetti(); } else SFX.finish();
   }
 
@@ -1378,12 +1448,30 @@
       <p class="fx-tip" style="margin-top:.9rem" id="fx-perfect-rule">${STAR} <b>Perfect round:</b> name all ${ROUND} flags and answer all ${ROUND} bonus questions in one round for a gold stamp in your passport and a gold star on the high scores. The final wager does not count either way.</p>
       ${party ? `<p class="text-ink-soft text-sm mt-2">Pass and play: each turn is one flag, then the device goes to the next player. Everyone gets different flags of matching difficulty, and each player has their own hints, streak and final-flag wager. Games of ${ROUND} flags each also count for the high scores table.</p>` : ''}
       <button class="fx-go mt-6" data-act="play" data-primary>Start playing</button>
-      <div class="flex flex-wrap justify-center gap-x-7 mt-3"><button class="fx-quiet" data-act="rules-back">Back</button><button class="fx-quiet" data-act="passport">Passport · ${stamps(P.name).length} of ${POOL.length}</button>${textBtn()}</div>
+      <div class="flex flex-wrap justify-center gap-x-7 mt-3"><button class="fx-quiet" data-act="rules-back">Back</button><button class="fx-quiet" data-act="passport">Passport · ${passportDone(P.name) ? `★ ${experts(P.name).length} of ${POOL.length}` : `${stamps(P.name).length} of ${POOL.length}`}</button>${textBtn()}</div>
     </main>`;
   }
 
   // A finished day for the family group chat: the winner, everyone's score that day, and the month's points table.
   const MEDALS = ['🥇', '🥈', '🥉'];
+  // Milestones anyone reached on a given day: the family's copy of each player, and this device's own players.
+  function featsOn(date) {
+    const f = family(), cache = f && store.get('fx-cloud-people', null), people = new Map();
+    if (cache && cache.fid === f.fid) for (const p of cache.list || []) people.set(pidOf(p.name), { name: p.name, marks: Object.assign({}, p.marks) });
+    const names = store.get('fx-people', {});
+    for (const [k, m] of Object.entries(store.get('fx-marks', {}))) {
+      const name = (names[k] && names[k].name) || k, id = pidOf(name), p = people.get(id) || { name, marks: {} };
+      for (const [key, t] of Object.entries(m || {})) if (!p.marks[key] || t < p.marks[key]) p.marks[key] = t;
+      people.set(id, p);
+    }
+    const out = [];
+    for (const p of people.values()) {
+      const keys = headline(Object.keys(p.marks).filter(key => p.marks[key] > 0 && dayKey(new Date(p.marks[key])) === date));
+      for (const key of keys) out.push({ name: p.name, key, t: p.marks[key] });
+    }
+    return out.sort((a, b) => a.t - b.t);
+  }
+  const featLine = x => x.key === 'world' ? `🌍 ${x.name} stamped every country in the passport!` : x.key === 'expert' ? `⭐ ${x.name} completed the Expert passport!` : `🗺️ ${x.name} completed ${CONTS[+x.key.slice(1)]}!`;
   function dayText(date, book = daysBook()) {
     const rows = [...(book.get(date) || [])].sort((a, b) => b.score - a.score || a.t - b.t), won = dayWinners(rows);
     let place = 0;
@@ -1397,7 +1485,8 @@
     const monthOver = todayKey().slice(0, 7) > month, lastHere = sofar[sofar.length - 1] === date && ![...book.keys()].some(k => k.startsWith(month) && k > date);
     const span = monthOver && lastHere ? ', final' : !monthOver && lastHere ? ' so far' : ` up to ${dayLabel(date).replace(/^[A-Za-z]+ /, '')}`;
     const link = /^https:$/.test(location.protocol) ? location.href.split(/[?#]/)[0] : '';
-    return [`🌍 Flag Explorer · Today's challenge`, dayLabel(date), '', head, '', ...lines, '', `📊 ${monthName} points${span}`, ...board,
+    const feats = featsOn(date).map(featLine);
+    return [`🌍 Flag Explorer · Today's challenge`, dayLabel(date), '', head, ...(feats.length ? ['', ...feats] : []), '', ...lines, '', `📊 ${monthName} points${span}`, ...board,
       ...(link ? ['', `Play today's flags: ${link}`] : [])].join('\n');
   }
 
@@ -1513,11 +1602,14 @@
   </svg>`;
   function ppPage(n) {
     const pages = ppPages(), pg = pages[n];
-    if (pg.type === 'cover') return `<div class="pp-cover"><span class="pp-cover-t">Passport</span>${EMBLEM}<span class="pp-cover-b">Flag Explorer</span></div>`;
+    if (pg.type === 'cover') {
+      const done = passportDone(P.name), master = done && experts(P.name).length >= POOL.length;
+      return `<div class="pp-cover${done ? ' gold' : ''}"><span class="pp-cover-t">Passport</span>${EMBLEM}<span class="pp-cover-b">Flag Explorer${done ? `<small>${master ? 'Expert · every flag mastered' : 'Every country stamped'}</small>` : ''}</span></div>`;
+    }
     if (pg.type === 'id') {
       const key = plain(P.name), no = 'FX' + String(hashStr(key) % 10000000).padStart(7, '0');
       const mrzName = (key.toUpperCase().replace(/[^A-Z]/g, '<') + '<'.repeat(30)).slice(0, 27);
-      const conts = new Set(stamps(P.name).filter(a => C[a]).map(a => C[a].cont)).size;
+      const conts = new Set(stamps(P.name).filter(a => C[a]).map(a => C[a].cont)).size, full = achieved(P.name).filter(m => m[0] === 'c').length, done = passportDone(P.name);
       const f = (label, value) => `<span class="pp-f">${label}</span><span class="pp-v">${value}</span>`;
       return `<div class="pp-page">
         <div class="pp-top"><span>Passport</span><span>Flag Explorer</span></div>
@@ -1528,7 +1620,8 @@
             ${f('Name / Nom / Nombre', esc(P.name))}
             ${f('Nationality / Nationalité', 'Explorer of the world')}
             ${f('Flags stamped', `${pg.total} of ${POOL.length}`)}
-            ${f('Continents reached', `${conts} of ${CONTS.length}`)}
+            ${f('Continents reached', `${conts} of ${CONTS.length}${full ? ` · ${full} complete` : ''}`)}
+            ${done ? f('Expert stars', `${experts(P.name).length} of ${POOL.length}`) : ''}
           </div>
         </div>
         <p class="pp-f" style="margin-top:5%">Signature of bearer</p>
@@ -1547,12 +1640,15 @@
         <div class="pp-foot"><span>Honours</span><span>${n - 1}</span></div>
       </div>`;
     }
+    const ex = new Set(experts(P.name)), done = passportDone(P.name);
     const stamp = a => {
       const h = hashStr(a + 'stamp'), name = C[a].name, shape = name.length > 13 ? 1 : h % 3;
-      return `<div class="pp-stamp s${shape}" style="--k:var(--pp-ink-${INKS[(h >>> 3) % 4]});--r:${((h >>> 6) % 15) - 7}deg"><img data-flag="${a}" alt=""><span>${esc(name)}</span></div>`;
+      return `<div class="pp-stamp s${shape}" style="--k:var(--pp-ink-${INKS[(h >>> 3) % 4]});--r:${((h >>> 6) % 15) - 7}deg">${ex.has(a) ? '<b class="pp-xs" title="Named with no hints">★</b>' : ''}<img data-flag="${a}" alt=""><span>${esc(name)}</span></div>`;
     };
+    const stars = pg.codes.length ? CONT_CODES[CONTS.indexOf(pg.name)].filter(a => ex.has(a)).length : 0;
+    const right = done ? `<span class="pp-done">★ ${stars} of ${pg.total}</span>` : pg.count === pg.total ? `<span class="pp-done">Complete</span> · ${pg.count}` : `${pg.count} of ${pg.total}`;
     return `<div class="pp-page">
-      <div class="pp-top"><span>${pg.name}${pg.parts > 1 ? ` · ${pg.part} of ${pg.parts}` : ''}</span><span>${pg.count} of ${pg.total}</span></div>
+      <div class="pp-top"><span>${pg.name}${pg.parts > 1 ? ` · ${pg.part} of ${pg.parts}` : ''}</span><span>${right}</span></div>
       ${pg.codes.length ? `<div class="pp-grid">${pg.codes.map(stamp).join('')}</div>` : `<div class="pp-none">No stamps from ${pg.name} yet. Name one of its ${pg.total} flags to earn the first.</div>`}
       <div class="pp-foot"><span>Visas</span><span>${n - 1}</span></div>
     </div>`;
@@ -1562,17 +1658,18 @@
       <span class="fx-label whitespace-nowrap">Page ${n} of ${len - 1}</span>
       <button class="fx-quiet whitespace-nowrap" data-act="pp-next" ${n >= len - 1 ? 'disabled style="visibility:hidden"' : ''}>Next</button>`;
   function viewPassport() {
-    const pages = ppPages(), total = pages[1].total;
+    const pages = ppPages(), done = passportDone(P.name), total = done ? experts(P.name).length : pages[1].total;
     S.pp = Math.min(S.pp || 0, pages.length - 1);
     return `<main class="fx-sheet mx-auto max-w-xl">
       <div class="fx-band flex items-end justify-between gap-3">
         <div class="min-w-0"><p class="fx-label">Passport of</p><h1 class="fx-h text-3xl fx-clip whitespace-nowrap">${esc(P.name)}</h1></div>
-        <p class="fx-label flex-none text-right"><span class="fx-num">${total}</span><br>of ${POOL.length} stamped</p>
+        <p class="fx-label flex-none text-right"><span class="fx-num">${total}</span><br>of ${POOL.length} ${done ? 'expert stars' : 'stamped'}</p>
       </div>
-      <div class="fx-meter" role="img" aria-label="${total} of ${POOL.length} flags stamped"><i style="width:${(100 * total / POOL.length).toFixed(1)}%"></i></div>
+      <div class="fx-meter" role="img" aria-label="${total} of ${POOL.length} ${done ? 'expert stars' : 'flags stamped'}"><i style="width:${(100 * total / POOL.length).toFixed(1)}%${done ? ';background:var(--gold)' : ''}"></i></div>
       <div class="pp-stage mt-2"><div class="pp-book" id="pp-book" role="button" tabindex="0" data-act="pp-flip" aria-label="Passport. Tap the right side to turn the page, the left side to go back."><div class="pp-leaf">${ppPage(S.pp)}</div></div></div>
       <div class="flex items-center justify-between gap-3" id="pp-nav">${ppNav(S.pp, pages.length)}</div>
-      <p class="text-ink-soft text-sm text-center mt-2">A flag is stamped the first time you name it correctly, in any recorded game.</p>
+      <p class="text-ink-soft text-sm text-center mt-2" id="pp-rule">${done ? `Passport complete. A gold star goes on a stamp the first time you name that flag with no hints. Star all ${POOL.length} for the Expert passport.`
+        : `A flag is stamped the first time you name it correctly, in any recorded game. Complete a continent, then the whole world.`}</p>
       <button class="fx-go mt-5" data-act="back">Back</button>
     </main>`;
   }
@@ -1794,6 +1891,24 @@
     return `Flag Explorer · ${todayLabel()}\n${P.avatar} ${P.name} scored ${fmt(S.score)}\n${grid}\nBonus questions ${t.bonusWon} of ${S.round.length} · best streak ${S.topStreak}${S.perfect ? '\n⭐ Perfect round' : ''}`;
   }
 
+  // What a round added to the passport, and how close the next finish line is
+  function stampNote(s, name) {
+    const parts = [], left = stillMissing(name).length, done = passportDone(name);
+    if (s.newStamps) parts.push(`<b class="font-semibold">${plural(s.newStamps, 'new passport stamp')}.</b> <span class="text-ink-soft">${stamps(name).filter(a => C[a]).length} of ${POOL.length} collected.</span>`);
+    if (s.newExpert) parts.push(`<b class="font-semibold">${plural(s.newExpert, 'new expert star')}.</b> <span class="text-ink-soft">${experts(name).length} of ${POOL.length} for the Expert passport.</span>`);
+    if (left && left <= LAST_STRETCH) parts.push(`<span class="text-ink-soft">Only ${left} to go${done ? ' for the Expert passport' : ' for a full passport'}. Free play now deals ${left === 1 ? 'it' : 'them'} more often.</span>`);
+    return parts.length ? `<p class="text-sm mt-2" id="fx-stamp-note">${parts.join(' ')}</p>` : '';
+  }
+  function featBlock(key) {
+    if (key === 'world') return `<div class="fx-feat big" id="fx-feat-world"><p class="fx-label">Every country in the world</p><h2>🌍 Passport complete</h2>
+      <p>All ${POOL.length} flags are stamped. Your passport cover is now gold.</p>
+      <p><b class="font-semibold">Next, the Expert passport:</b> every flag you name with no hints now earns a gold star on its stamp. Star all ${POOL.length} to finish it.</p></div>`;
+    if (key === 'expert') return `<div class="fx-feat big" id="fx-feat-expert"><p class="fx-label">Every flag, not one hint</p><h2>★ Expert passport complete</h2>
+      <p>You have named all ${POOL.length} flags without a single hint. The whole world, mastered.</p></div>`;
+    const ci = +key.slice(1);
+    return `<div class="fx-feat" data-feat="${key}"><h2>🗺️ ${CONTS[ci]} complete</h2><p>All ${CONT_CODES[ci].length} of its flags are stamped in your passport.</p></div>`;
+  }
+
   function viewEnd() {
     const t = totals(S.log), lockedN = S.log.filter(e => e.bonus === 'locked').length, daily = S.mode === 'daily', have = stamps(P.name).length;
     const summary = S.perfect ? 'Every flag and every bonus question right. A gold stamp is in your passport, and a gold star marks this score.'
@@ -1814,7 +1929,8 @@
         ${S.newBest ? `<p class="fx-label mt-4" style="color:var(--ochre)">New personal best</p>` : ''}
         ${S.practice ? `<p class="fx-label mt-4">Practice replay: not recorded</p>` : ''}
         <p class="font-script text-lg mt-4">${summary}</p>
-        ${S.newStamps ? `<p class="text-sm mt-2"><b class="font-semibold">${plural(S.newStamps, 'new passport stamp')}.</b> <span class="text-ink-soft">${have} of ${POOL.length} collected.</span></p>` : ''}
+        ${stampNote(S, P.name)}
+        ${(S.feats || []).map(featBlock).join('')}
         ${daily && !S.practice ? `<h2 class="fx-label mt-6">Share today's result</h2>
           <pre class="fx-share mt-1" id="fx-share">${esc(shareText())}</pre>
           <button class="fx-go mt-3" data-act="copy" data-primary>Copy result</button>
@@ -1863,7 +1979,7 @@
         <span class="fx-num text-xl">${fmt(r.S.score)}</span>
       </li>`;
     }).join('');
-    const placed = rank.filter(r => r.S.place), stamped = rank.filter(r => r.S.newStamps), flawless = rank.filter(r => r.S.perfect);
+    const placed = rank.filter(r => r.S.place), stamped = rank.filter(r => r.S.newStamps), flawless = rank.filter(r => r.S.perfect), featted = rank.filter(r => (r.S.feats || []).length);
     const folds = rank.map((r, i) => `<details class="fx-fold" ${i ? '' : 'open'}>
         <summary><span class="fx-ava" style="--s:1.9rem" aria-hidden="true">${esc(r.P.avatar)}</span><span class="fx-clip whitespace-nowrap min-w-0 font-medium">${esc(r.P.name)}</span><span class="fx-num">${fmt(r.S.score)}</span></summary>
         ${r.S.log.length ? `<ol class="pb-2">${logRows(r.S.log)}</ol>` : `<p class="text-sm text-ink-soft pb-2">No flags played.</p>`}
@@ -1882,6 +1998,7 @@
         ${flawless.length ? `<p class="text-sm mt-4" id="fx-flawless">${STAR} <b class="font-semibold">Perfect round:</b> ${listOf(flawless.map(r => esc(r.P.name)))}. A gold stamp is in ${flawless.length > 1 ? 'each passport' : 'the passport'}.</p>` : ''}
         ${placed.length ? `<p class="text-sm ${flawless.length ? 'mt-2' : 'mt-4'}"><b class="font-semibold">High scores:</b> ${placed.map(r => `${esc(r.P.name)} ${ORD[r.S.place - 1]}`).join(', ')}.</p>` : ''}
         ${stamped.length ? `<p class="text-sm mt-2"><b class="font-semibold">New passport stamps:</b> ${stamped.map(r => `${esc(r.P.name)} ${r.S.newStamps}`).join(', ')}.</p>` : ''}
+        ${featted.length ? `<div class="fx-feat" id="fx-match-feats"><h2>🗺️ Passport milestones</h2>${featted.map(r => `<p><b class="font-semibold">${esc(r.P.name)}</b> completed ${listOf(headline(r.S.feats).map(featName))}!</p>`).join('')}</div>` : ''}
         ${each === ROUND ? '' : `<p class="text-sm text-ink-soft mt-2">Games of ${each} flags each stay off the high scores table.</p>`}
         <button class="fx-go mt-6" data-act="rematch" data-primary>Play again</button>
         <button class="fx-quiet block mx-auto mt-3" data-act="choose">Choose another game</button>
@@ -2058,7 +2175,7 @@
     if (act === 'family-sync') { cloudState.ok = null; cloudSync(); return render(false); }
     if (act === 'family-leave') {
       if (!S.confirmLeave) { S.confirmLeave = true; return render(false); }
-      ['fx-family', 'fx-cloud', 'fx-cloud-days', 'fx-synced', 'fx-pushed', 'fx-faces'].forEach(k => store.set(k, null)); S.confirmLeave = false; cloudState.ok = null;
+      ['fx-family', 'fx-cloud', 'fx-cloud-days', 'fx-cloud-people', 'fx-synced', 'fx-pushed', 'fx-faces'].forEach(k => store.set(k, null)); S.confirmLeave = false; cloudState.ok = null;
       return render(false);
     }
     if (act === 'claim-no') { S.claim = null; S.name = ''; render(false); app.querySelector('#fx-name').focus(); return; }
