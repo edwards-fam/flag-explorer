@@ -71,6 +71,16 @@ eq(await L.locator('#fx-days .fx-day').count(), 6, 'recent winners listed'); ass
 eq((await L.locator('#fx-wins .fx-hrank').allTextContents()).join(), '1st,1st', 'equal wins show the same place');
 await L.screenshot({ path: 'v2-wins-month.png', fullPage: true }); await overflow(L, 'wins month');
 await L.click('[data-act=span][data-v=all]'); eq((await txt(L, '#fx-wins-foot')).trim(), 'Robin and Casey share the lead with 3 wins each.', 'all-time view');
+// ranked by points: every first try adds up
+eq(await L.evaluate(() => window.__fx.winsTable('2026-10', undefined, 'points').map(e => `${e.place} ${e.name} ${e.points}/${e.wins}`).join(' | ')), `1 Robin ${1200 + rScore}/2 | 2 Alex 2580/2`, 'October by points: 900 + 300 + Robin’s round, against 900 + 1,680');
+eq(await L.evaluate(() => window.__fx.winsTable('all', undefined, 'points').map(e => `${e.place} ${e.name} ${e.points}`).join(' | ')), `1 Alex 3380 | 2 Robin ${1200 + rScore} | 3 Casey 1500`, 'all time by points, where wins alone would put Casey first');
+await L.click('[data-act=rank][data-v=points]'); eq((await txt(L, '#fx-wins-foot')).trim(), 'Alex leads overall with 3,380 points.', 'points leader worded');
+assert((await txt(L, '.fx-hhead')).includes('Points'), 'the column says Points'); assert((await txt(L, '#fx-wins .fx-hrow')).includes('2 wins'), 'each row still shows the wins');
+assert((await txt(L, '#fx-wins-key')).includes('every day played counts'), 'the key explains points');
+await L.screenshot({ path: 'v6-points-all.png', fullPage: true }); await overflow(L, 'points all');
+await L.click('[data-act=span][data-v=month]'); eq((await txt(L, '#fx-wins-last')).trim(), 'September went to Casey with 1,500 points.', 'last month by points');
+await L.click('[data-act=back]'); await L.click('[data-act=board]'); await L.click('[data-act=tab][data-v=wins]'); eq(await L.locator('[data-act=rank][data-v=points][aria-pressed=true]').count(), 1, 'the choice of ranking is remembered');
+await L.click('[data-act=rank][data-v=wins]'); await L.click('[data-act=span][data-v=all]');
 eq(await L.locator('#fx-wins-last').count(), 0, 'no last-month line on the all-time view'); eq((await L.locator('#fx-wins .fx-hrank').allTextContents()).join(), '1st,1st,3rd', 'places on the all-time view');
 await L.screenshot({ path: 'v3-wins-all.png', fullPage: true }); await overflow(L, 'wins all');
 // starting fresh clears the wins too

@@ -692,21 +692,23 @@
     return book;
   }
   const dayWinners = rows => { const top = Math.max(...rows.map(r => r.score)); return rows.filter(r => r.score === top); };
-  // Standings for a span of days: 'all', or a month as 'YYYY-MM'. Equal wins share a place.
-  function winsTable(span, book = daysBook()) {
+  // Standings for a span of days: 'all', or a month as 'YYYY-MM', ranked by days won or by points added up over every day played.
+  // Equal standing shares a place.
+  function winsTable(span, book = daysBook(), by = 'wins') {
     const who = new Map();
     for (const [date, rows] of book) {
       if (span !== 'all' && !date.startsWith(span)) continue;
       const won = dayWinners(rows);
       for (const r of rows) {
-        const k = pidOf(r.name), e = who.get(k) || { name: r.name, avatar: r.avatar, wins: 0, played: 0, t: 0 };
+        const k = pidOf(r.name), e = who.get(k) || { name: r.name, avatar: r.avatar, wins: 0, points: 0, played: 0, t: 0 };
         if (r.t >= e.t) { e.name = r.name; e.avatar = r.avatar; e.t = r.t; }       // the name and picture they used most recently
-        e.played++; if (won.includes(r)) e.wins++;
+        e.played++; e.points += Math.max(0, r.score); if (won.includes(r)) e.wins++;
         who.set(k, e);
       }
     }
-    const list = [...who.values()].sort((a, b) => b.wins - a.wins || b.played - a.played || (plain(a.name) < plain(b.name) ? -1 : 1));
-    list.forEach((e, i) => { e.place = i && list[i - 1].wins === e.wins ? list[i - 1].place : i + 1; });
+    const key = by === 'points' ? 'points' : 'wins', other = key === 'wins' ? 'points' : 'wins';
+    const list = [...who.values()].sort((a, b) => b[key] - a[key] || b[other] - a[other] || b.played - a.played || (plain(a.name) < plain(b.name) ? -1 : 1));
+    list.forEach((e, i) => { e.place = i && list[i - 1][key] === e[key] ? list[i - 1].place : i + 1; });
     return list;
   }
   const ordinal = n => ORD[n - 1] || n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
@@ -1345,32 +1347,38 @@
   // The daily wins: who has won Today's challenge most often, this month and since the start
   const nameList = list => { const n = list.map(e => esc(e.name)); return n.length < 3 ? n.join(' and ') : n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1]; };
   function viewWins() {
-    const book = daysBook(), month = todayKey().slice(0, 7), all = S.span === 'all', monthName = MONTH_NAMES[+month.slice(5) - 1];
-    const list = winsTable(all ? 'all' : month, book), lead = list.filter(e => e.place === 1);
+    const book = daysBook(), month = todayKey().slice(0, 7), all = S.span === 'all', byPoints = S.rank === 'points', by = byPoints ? 'points' : 'wins', monthName = MONTH_NAMES[+month.slice(5) - 1];
+    const list = winsTable(all ? 'all' : month, book, by), lead = list.filter(e => e.place === 1);
+    const count = e => byPoints ? plural(e.points, 'point').replace(/^\d+/, fmt(e.points)) : plural(e.wins, 'win');
     const rows = (list.length ? list.slice(0, 30) : [null, null, null]).map((e, i) => `<li class="fx-hrow ${e ? '' : 'empty'} ${e && e.place === 1 ? 'top' : ''}">
         <span class="fx-hrank">${e ? ordinal(e.place) : ORD[i]}</span>
         <span class="fx-ava ${e ? '' : 'blank'}" style="--s:2.1rem" aria-hidden="true">${e ? esc(e.avatar) : ''}</span>
-        <span class="min-w-0"><span class="fx-clip whitespace-nowrap block ${e ? 'font-medium' : ''}">${e ? esc(e.name) : '· · ·'}</span>${e ? `<span class="fx-label fx-clip whitespace-nowrap block" style="margin-top:.1rem">played ${plural(e.played, 'day')}</span>` : ''}</span>
-        <span class="fx-num text-lg">${e ? fmt(e.wins) : ''}</span>
+        <span class="min-w-0"><span class="fx-clip whitespace-nowrap block ${e ? 'font-medium' : ''}">${e ? esc(e.name) : '· · ·'}</span>${e ? `<span class="fx-label block" style="margin-top:.1rem">${plural(e.played, 'day')} · <span class="whitespace-nowrap">${byPoints ? plural(e.wins, 'win') : fmt(e.points) + ' pts'}</span></span>` : ''}</span>
+        <span class="fx-num text-lg">${e ? fmt(byPoints ? e.points : e.wins) : ''}</span>
       </li>`).join('');
     const foot = !list.length ? (all ? 'No finished days yet.' : `No finished days in ${monthName} yet.`)
-      : lead.length > 1 ? `${nameList(lead)} share the lead with ${plural(lead[0].wins, 'win')} each.`
-      : `${esc(lead[0].name)} leads ${all ? 'overall' : monthName} with ${plural(lead[0].wins, 'win')}.`;
+      : lead.length > 1 ? `${nameList(lead)} share the lead with ${count(lead[0])} each.`
+      : `${esc(lead[0].name)} leads ${all ? 'overall' : monthName} with ${count(lead[0])}.`;
     // last month's result stays in view while the new month is young
-    const before = dayShift(month + '-01', -1).slice(0, 7), past = all ? [] : winsTable(before, book).filter(e => e.place === 1);
-    const lastMonth = past.length ? `${MONTH_NAMES[+before.slice(5) - 1]} went to ${nameList(past)} with ${plural(past[0].wins, 'win')}${past.length > 1 ? ' each' : ''}.` : '';
+    const before = dayShift(month + '-01', -1).slice(0, 7), past = all ? [] : winsTable(before, book, by).filter(e => e.place === 1);
+    const lastMonth = past.length ? `${MONTH_NAMES[+before.slice(5) - 1]} went to ${nameList(past)} with ${count(past[0])}${past.length > 1 ? ' each' : ''}.` : '';
     const recent = [...book].slice(-7).reverse().map(([date, day]) => { const won = dayWinners(day);
       return `<li class="fx-day"><span class="fx-label">${dayLabel(date)}</span><span class="fx-clip whitespace-nowrap min-w-0">${won.map(r => `<span aria-hidden="true">${esc(r.avatar)}</span> ${esc(r.name)}`).join(' · ')}</span><span class="fx-num">${fmt(won[0].score)}</span></li>`; }).join('');
-    const spanBtn = (v, label) => `<button type="button" class="fx-pick" data-act="span" data-v="${v}" aria-pressed="${all === (v === 'all')}">${label}</button>`;
-    return `<p class="fx-label mt-5" id="fx-span-l">Wins counted over</p>
-      <div class="grid grid-cols-2 gap-2 mt-1" role="group" aria-labelledby="fx-span-l" id="fx-span">${spanBtn('month', monthName)}${spanBtn('all', 'All time')}</div>
-      <div class="fx-hhead fx-label mt-5" aria-hidden="true"><span>Rank</span><span style="width:2.1rem"></span><span>Explorer</span><span>Wins</span></div>
+    const pick = (act, on, v, label) => `<button type="button" class="fx-pick" data-act="${act}" data-v="${v}" aria-pressed="${on}">${label}</button>`;
+    return `<div class="grid grid-cols-2 gap-x-2 mt-5">
+        <p class="fx-label" id="fx-span-l">Standings for</p><p class="fx-label" id="fx-rank-l">Rank by</p>
+        <div class="grid grid-cols-2 gap-1.5 mt-1" role="group" aria-labelledby="fx-span-l" id="fx-span">${pick('span', !all, 'month', monthName.slice(0, 3))}${pick('span', all, 'all', 'All time')}</div>
+        <div class="grid grid-cols-2 gap-1.5 mt-1" role="group" aria-labelledby="fx-rank-l" id="fx-rank">${pick('rank', !byPoints, 'wins', 'Wins')}${pick('rank', byPoints, 'points', 'Points')}</div>
+      </div>
+      <div class="fx-hhead fx-label mt-5" aria-hidden="true"><span>Rank</span><span style="width:2.1rem"></span><span>Explorer</span><span>${byPoints ? 'Points' : 'Wins'}</span></div>
       <ol id="fx-wins">${rows}</ol>
       <p class="font-script text-lg text-center mt-4" id="fx-wins-foot">${foot}</p>
       ${lastMonth ? `<p class="text-sm text-center mt-1" id="fx-wins-last">${lastMonth}</p>` : ''}
       ${recent ? `<p class="fx-label mt-6">Recent winners</p><ul class="mt-1" id="fx-days">${recent}</ul>` : ''}
       ${family() ? `<p class="text-sm text-ink-soft text-center mt-4" id="fx-cloud-note" role="status">${cloudNote()}</p>` : ''}
-      <p class="text-sm text-ink-soft text-center mt-2" id="fx-wins-key">The top score in Today's challenge wins the day, and a tie gives each player a win. Today's winner is counted at midnight.</p>`;
+      <p class="text-sm text-ink-soft text-center mt-2" id="fx-wins-key">${byPoints
+        ? `Points add up every score in Today's challenge, so every day played counts. Only the first try each day is scored. Today's score is added at midnight.`
+        : `The top score in Today's challenge wins the day, and a tie gives each player a win. Today's winner is counted at midnight.`}</p>`;
   }
 
   // The high-score tables: a ledger of ten lines per table, the newest entry marked
@@ -1970,8 +1978,9 @@
     if (act === 'guest-add') { if (O.guests.length < SEATS - 1) O.guests.push({ name: '', avatar: spareAvatar() }); tidyParty(); render(false); const boxes = app.querySelectorAll('.fx-guest'); boxes[boxes.length - 1].focus(); return; }
     if (act === 'guest-del') { O.guests.splice(+el.dataset.i, 1); tidyParty(); return render(false); }
     if (act === 'guest-ava') { O.guests[+el.dataset.i].avatar = spareAvatar(); SFX.tap(); return render(false); }
-    if (act === 'tab') { S.tab = el.dataset.v; S.confirmWipe = false; if (S.tab === 'wins') cloudSoon(); return render(false); }
+    if (act === 'tab') { S.tab = el.dataset.v; S.confirmWipe = false; if (S.tab === 'wins') { S.rank = S.rank || store.get('fx-rank', 'wins'); cloudSoon(); } return render(false); }
     if (act === 'span') { S.span = el.dataset.v; return render(false); }
+    if (act === 'rank') { S.rank = el.dataset.v; store.set('fx-rank', S.rank); return render(false); }
     if (act === 'wipe') {
       if (!S.confirmWipe) { S.confirmWipe = true; return render(false); }
       wipeRecords(); S.confirmWipe = false; SFX.tap();
