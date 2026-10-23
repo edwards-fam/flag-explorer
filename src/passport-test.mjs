@@ -10,6 +10,7 @@ async function mk(label, { cloud = false, width = 390 } = {}) {
   const ctx = await browser.newContext({ viewport: { width, height: 844 }, deviceScaleFactor: 2 }), p = await ctx.newPage();
   p.on('pageerror', e => errors.push(`pageerror(${label}) ${e.message}`)); p.on('console', m => { if (m.type() === 'error' && !m.text().includes('404')) errors.push(`console(${label}) ${m.text()}`); });       // a 404 is the database saying a player does not exist yet
   if (cloud) await p.addInitScript(cfg => { window.FX_CLOUD = cfg; }, { projectId: 'demo', apiKey: 'test-key', base: mock.base });
+  await p.clock.install({ time: new Date('2026-10-13T12:00:00') });      // the day summaries below are for 11 and 12 October, so the test lives on the 13th
   await p.goto(url); await p.waitForTimeout(250); return p;
 }
 const st = p => p.evaluate(() => JSON.parse(JSON.stringify(window.__fx.state)));

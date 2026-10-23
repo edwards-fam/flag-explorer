@@ -20,13 +20,15 @@ service cloud.firestore {
           && d.avatar is string && d.avatar.size() <= 16;
       }
       function goodScore(d) {
-        return d.keys().hasOnly(['name', 'avatar', 'score', 'streak', 'clock', 'perfect', 't'])
+        return d.keys().hasOnly(['name', 'avatar', 'score', 'streak', 'clock', 'perfect', 't', 'ms'])
           && d.keys().hasAll(['name', 'avatar', 'score', 'streak', 'clock', 'perfect', 't'])
           && goodName(d)
           && d.score is int && d.score >= 0 && d.score <= 2300
           && d.streak is int && d.streak >= 0 && d.streak <= 10
           && d.clock is bool && d.perfect is bool
-          && d.t is int && d.t > 0;
+          && d.t is int && d.t > 0
+          // Today's challenge: the round's time in milliseconds, which breaks a tie. Optional, as scores from before the clock have none.
+          && (!('ms' in d) || (d.ms is int && d.ms >= 0 && d.ms <= 3600000));
       }
       function goodPlayer(d) {
         return d.keys().hasOnly(['name', 'avatar', 'stamps', 'perfect', 'updated',

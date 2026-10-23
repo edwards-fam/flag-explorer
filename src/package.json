@@ -6,7 +6,7 @@
   "scripts": {
     "build": "node build.mjs",
     "build:test": "node build.mjs --test",
-    "test": "node build.mjs --test && node play3.mjs && node play4.mjs && node cloud-test.mjs && node wins-test.mjs && node passport-test.mjs && node build.mjs && node site-test.mjs"
+    "test": "node build.mjs --test && node play3.mjs && node play4.mjs && node cloud-test.mjs && node wins-test.mjs && node passport-test.mjs && node clock-test.mjs && node build.mjs && node site-test.mjs"
   },
   "devDependencies": {
     "@fontsource/barlow-condensed": "^5.3.0",

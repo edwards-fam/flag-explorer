@@ -396,6 +396,8 @@
   ];
   const STREAK = [[7, 30], [5, 20], [3, 10]];   // the streak is flags named with no hints in a row; from N in a row each one pays this much extra
   const CLOCK = 15;                             // seconds per flag when playing against the clock
+  const DAY_CLOCK = 20;                         // Today's challenge: seconds for each flag and each bonus question. No speed points; the total time breaks a tie.
+  const DAY_CLOCK_FROM = '2026-10-24';          // the first day Today's challenge is played against the clock
   const SPEED = [[3, 30], [6, 15]];             // against the clock: answer within N seconds for this much extra
   const WAGERS = [100, 250];                    // what can be risked on the final flag
   const RANKS = [[1600, 'World Ambassador'], [1200, 'Globetrotter'], [800, 'Frequent Flyer'], [400, 'Weekend Tripper'], [0, 'Tourist']];
@@ -504,6 +506,10 @@
   const pad2 = n => String(n).padStart(2, '0');
   const dayKey = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
   const todayKey = () => dayKey(new Date());
+  const dayTimed = () => todayKey() >= DAY_CLOCK_FROM;
+  // A round's time, as a player reads it: 48.3 s, or 1:08.3 past a minute.
+  const timeText = ms => { const s = Math.round(ms / 100) / 10; return s < 60 ? s.toFixed(1) + ' s' : `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`; };
+  const timeOf = r => r && Number.isInteger(r.ms) && r.ms >= 0 ? r.ms : Infinity;      // no time recorded sorts after any time
   const keyDate = key => { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d); };
   const dayShift = (key, n) => { const d = keyDate(key); d.setDate(d.getDate() + n); return dayKey(d); };
   const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -654,7 +660,8 @@
   function savePrefs() { const all = store.get('fx-prefs', {}); all[plain(P.name)] = { pool: O.pool, clock: O.clock }; store.set('fx-prefs', all); }
 
   const ORD = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
-  const byScore = (a, b) => b.score - a.score || a.t - b.t;
+  // Best score first. Level on points, the faster time comes first (only Today's challenge records one), then whoever got there first.
+  const byScore = (a, b) => b.score - a.score || (timeOf(a) - timeOf(b) || 0) || a.t - b.t;
   // High-score tables: one per flag pool, plus one for today's challenge. Every finished round is an entry.
   function dailyData() { const d = store.get('fx-daily', null); return d && d.date === todayKey() && Array.isArray(d.rows) ? d : { date: todayKey(), rows: [] }; }
   const playedToday = name => dailyData().rows.find(r => plain(r.name) === plain(name)) || null;
@@ -687,7 +694,7 @@
   function logDay(date, row) {
     const all = store.get('fx-days', {}), rows = all[date] || [];
     if (!row || !row.name || rows.some(r => pidOf(r.name) === pidOf(row.name))) return;
-    all[date] = [...rows, { name: row.name, avatar: row.avatar, score: row.score, streak: row.streak || 0, clock: !!row.clock, perfect: !!row.perfect, t: row.t }];
+    all[date] = [...rows, Object.assign({ name: row.name, avatar: row.avatar, score: row.score, streak: row.streak || 0, clock: !!row.clock, perfect: !!row.perfect, t: row.t }, Number.isInteger(row.ms) ? { ms: row.ms } : {})];
     store.set('fx-days', all);
   }
   // Every finished day that has scores, oldest first: date → that day's rows, one per player.
@@ -703,7 +710,8 @@
     }
     return book;
   }
-  const dayWinners = rows => { const top = Math.max(...rows.map(r => r.score)); return rows.filter(r => r.score === top); };
+  // The top score wins. Level on points, the faster time wins; level on both (or no times recorded, as before the clock), each of them wins.
+  const dayWinners = rows => { const top = rows.filter(r => r.score === Math.max(...rows.map(x => x.score))), fast = Math.min(...top.map(timeOf)); return top.filter(r => timeOf(r) === fast); };
   // Standings for a span of days: 'all', or a month as 'YYYY-MM', ranked by days won or by points added up over every day played.
   // Equal standing shares a place.
   function winsTable(span, book = daysBook(), by = 'wins') {
@@ -852,7 +860,13 @@
     let refused = null;
     for (const [id, path, r] of todo) {
       if (done.has(id)) continue;
-      try { await fsCommit({ update: { name: `${fsRoot()}/families/${f.fid}/${path}`, fields: fsFields({ name: r.name, avatar: r.avatar || '', score: r.score, streak: r.streak || 0, clock: !!r.clock, perfect: !!r.perfect, t: r.t }) }, currentDocument: { exists: false } }); }
+      const fields = { name: r.name, avatar: r.avatar || '', score: r.score, streak: r.streak || 0, clock: !!r.clock, perfect: !!r.perfect, t: r.t };
+      const send = more => fsCommit({ update: { name: `${fsRoot()}/families/${f.fid}/${path}`, fields: fsFields(Object.assign({}, fields, more)) }, currentDocument: { exists: false } });
+      try {
+        if (!Number.isInteger(r.ms)) await send({});
+        else try { await send({ ms: r.ms }); }
+        catch (e) { if (e.status !== 403) throw e; await send({}); }        // a scoreboard whose rules predate the clock still takes the score, without its time
+      }
       catch (e) { if (!e.status) throw e; refused = refused || e; continue; }       // one refused score must not hold back the others
       done.add(id); store.set('fx-synced', { fid: f.fid, ids: [...done].slice(-600) });
     }
@@ -945,7 +959,7 @@
     for (let i = 0; i < want.length; i += 6) {
       await Promise.all(want.slice(i, i + 6).map(async k => {
         const res = await fsGet(`families/${f.fid}/days/${k}/entries?pageSize=60`);
-        days[k] = { rows: ((res && res.documents) || []).map(fsDoc).filter(okRow).map(r => ({ name: r.name, avatar: r.avatar, score: r.score, t: r.t })), done: k < settled };
+        days[k] = { rows: ((res && res.documents) || []).map(fsDoc).filter(okRow).map(r => Object.assign({ name: r.name, avatar: r.avatar, score: r.score, t: r.t }, Number.isInteger(r.ms) ? { ms: r.ms } : {})), done: k < settled };
       }));
       if (i + 6 < want.length) save();
     }
@@ -1072,12 +1086,14 @@
     const round = buildRound(codes);
     rand = Math.random;
     M = null;
-    S = roundState(round, P.name, { mode: daily ? 'daily' : 'free', table: daily ? 'daily' : O.pool, clock: !daily && !!O.clock, practice: daily && !!playedToday(P.name) });
+    S = roundState(round, P.name, { mode: daily ? 'daily' : 'free', table: daily ? 'daily' : O.pool, clock: !daily && !!O.clock, practice: daily && !!playedToday(P.name),
+      limit: daily ? (dayTimed() ? DAY_CLOCK : 0) : O.clock ? CLOCK : 0 });
     startQuestion();
   }
   // One player's round. A player new to this device gets a single tip on their first flag.
   function roundState(round, name, more) {
-    return Object.assign({ screen: 'play', mode: 'free', table: O.pool, clock: !!O.clock, practice: false, round, i: 0, score: 0, streak: 0, topStreak: 0, log: [], q: null,
+    // limit: seconds allowed for each answer (0 for no clock). ms: the time taken over the round's timed answers.
+    return Object.assign({ screen: 'play', mode: 'free', table: O.pool, clock: !!O.clock, limit: O.clock ? CLOCK : 0, ms: 0, practice: false, round, i: 0, score: 0, streak: 0, topStreak: 0, log: [], q: null,
       confirmEnd: false, newBest: false, newStamps: 0, newExpert: 0, feats: [], place: 0, entryT: 0, perfect: false, tip: !store.get('fx-tipped', []).includes(plain(name)) }, more);
   }
 
@@ -1154,6 +1170,12 @@
     SFX.hint();
   }
 
+  // Today's challenge times the bonus question too, so it cannot be looked up; free play's clock is for the flag alone.
+  const bonusTimed = () => !!(S.limit && S.mode === 'daily');
+  function beginBonus() { S.q.phase = 'bonus'; S.q.t0 = Date.now(); }
+  // The time an answer took, counted towards the round's time. A timed-out answer counts as the full allowance.
+  function addTime(secs) { if (S.limit) S.ms = (S.ms || 0) + Math.round(1000 * Math.min(S.limit, Math.max(0, secs))); }
+
   // a2 is the country picked, or null when the clock ran out.
   function answer(a2) {
     const q = S.q;
@@ -1161,6 +1183,7 @@
     if (S.tip) { S.tip = false; store.set('fx-tipped', [...new Set([...store.get('fx-tipped', []), plain(P.name)])]); }   // the first-flag tip is shown once per player
     q.pick = a2;
     const ok = a2 === q.a2, secs = (Date.now() - q.t0) / 1000, pts = ok ? flagWorth(q.hints) : 0;
+    addTime(secs);
     const clean = ok && !q.hints.length, run = S.streak;
     S.streak = clean ? S.streak + 1 : 0;        // a hint ends the streak just as a miss does
     S.topStreak = Math.max(S.topStreak, S.streak);
@@ -1181,6 +1204,7 @@
   function answerBonus(i) {
     const q = S.q, e = S.log[S.log.length - 1];
     if (q.phase !== 'bonus') return;
+    if (bonusTimed()) addTime((Date.now() - q.t0) / 1000);
     q.bonus.pick = i;
     if (i === q.bonus.answer) { e.bonus = 'won'; e.bonusPts = BONUS; S.score += BONUS; SFX.bonus(); } else { e.bonus = 'lost'; SFX.wrong(); }
     q.phase = 'bonusResult';
@@ -1203,6 +1227,7 @@
       bests[key] = { score: Math.max(prev.score, S.score), streak: Math.max(prev.streak, S.topStreak) };
       store.set('fx-bests', bests);
       const t = lastT = Math.max(Date.now(), lastT + 1), row = { name: P.name, avatar: P.avatar, score: S.score, streak: S.topStreak, clock: S.clock, t };
+      if (S.table === 'daily' && S.limit) row.ms = S.ms || 0;
       if (S.perfect) { row.perfect = true; addPerfect({ t, score: S.score, table: S.table, clock: S.clock }); }
       let list = null;
       if (S.table === 'daily') {          // today's challenge keeps every first try, even a zero
@@ -1374,7 +1399,7 @@
       <div class="grid gap-2 mt-3">
         <button type="button" class="fx-mode" data-act="opt" data-k="mode" data-v="daily" aria-pressed="${daily}">
           <span class="flex items-baseline justify-between gap-3"><b>Today's challenge</b><span class="fx-label">${todayLabel()}</span></span>
-          <small>${played ? `You scored ${fmt(played.score)} today. Playing again is practice and is not recorded.` : 'The same ten flags for everyone today. Your first try is the one that counts, and the top score wins the day.'}</small>
+          <small>${played ? `You scored ${fmt(played.score)} today. Playing again is practice and is not recorded.` : `The same ten flags for everyone today. Your first try is the one that counts, and the top score wins the day.${dayTimed() ? ` ${DAY_CLOCK} seconds to answer each flag and bonus question; the faster time breaks a tie.` : ''}`}</small>
         </button>
         <button type="button" class="fx-mode" data-act="opt" data-k="mode" data-v="free" aria-pressed="${O.mode === 'free'}">
           <span><b>Free play</b></span>
@@ -1407,6 +1432,7 @@
       <p class="text-sm mt-3"><span class="fx-star" aria-hidden="true">⭐</span> Earned only on flags you name with no hints.</p>
       <p class="text-ink-soft text-sm mt-2">Hint costs add up, but a correct answer always pays at least ${FLOOR}. Use even one hint and the bonus question stays locked for that flag.</p>
       <p class="text-ink-soft text-sm mt-2">The streak counts flags named with no hints, one after another. A hint or a miss sends it back to zero. Its bonus grows to +${STREAK[1][1]} at ${STREAK[1][0]} in a row and +${STREAK[0][1]} at ${STREAK[0][0]}. Before the last flag you may risk points on it; a wagered flag allows no hints.${clock ? ` Run out of time and the flag counts as a miss.` : ''}</p>
+      ${daily && dayTimed() ? `<p class="fx-tip" style="margin-top:.9rem" id="fx-day-clock"><b>Against the clock:</b> you have ${DAY_CLOCK} seconds for each flag and each bonus question, hints included. Run out of time and it counts as a miss. The clock keeps running if you leave the game. There are no points for speed, but your total time is recorded, and when two players finish level on points the faster time wins the day.</p>` : ''}
       <p class="fx-tip" style="margin-top:.9rem" id="fx-perfect-rule">${STAR} <b>Perfect round:</b> name all ${ROUND} flags and answer all ${ROUND} bonus questions in one round for a gold stamp in your passport and a gold star on the high scores. The final wager does not count either way.</p>
       ${party ? `<p class="text-ink-soft text-sm mt-2">Pass and play: each turn is one flag, then the device goes to the next player. Everyone gets different flags of matching difficulty, and each player has their own hints, streak and final-flag wager. Games of ${ROUND} flags each also count for the high scores table.</p>` : ''}
       <button class="fx-go mt-6" data-act="play" data-primary>Start playing</button>
@@ -1435,11 +1461,14 @@
   }
   const featLine = x => x.key === 'world' ? `🌍 ${x.name} stamped every country in the passport!` : x.key === 'expert' ? `⭐ ${x.name} completed the Expert passport!` : `🗺️ ${x.name} completed ${CONTS[+x.key.slice(1)]}!`;
   function dayText(date, book = daysBook()) {
-    const rows = [...(book.get(date) || [])].sort((a, b) => b.score - a.score || a.t - b.t), won = dayWinners(rows);
+    const rows = [...(book.get(date) || [])].sort(byScore), won = dayWinners(rows);
+    if (!rows.length) return `🌍 Flag Explorer · Today's challenge\n${dayLabel(date)}\n\nNo scores for this day.`;
     let place = 0;
-    const lines = rows.map((r, i) => { if (!i || r.score !== rows[i - 1].score) place = i + 1; return `${MEDALS[place - 1] || place + '.'} ${r.avatar} ${r.name} ${fmt(r.score)}`; });
+    const lines = rows.map((r, i) => { if (!i || r.score !== rows[i - 1].score || timeOf(r) !== timeOf(rows[i - 1])) place = i + 1; return `${MEDALS[place - 1] || place + '.'} ${r.avatar} ${r.name} ${fmt(r.score)}${Number.isInteger(r.ms) ? ` · ${timeText(r.ms)}` : ''}`; });
     const names = won.map(r => r.name), month = date.slice(0, 7), monthName = MONTH_NAMES[+month.slice(5) - 1];
-    const head = won.length > 1 ? `🏆 ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]} tie for the win with ${fmt(won[0].score)}!` : `🏆 ${names[0]} wins with ${fmt(won[0].score)}!`;
+    const level = rows.filter(r => r.score === won[0].score).length > won.length;          // someone matched the winning score but was slower
+    const head = won.length > 1 ? `🏆 ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]} tie for the win with ${fmt(won[0].score)}!`
+      : `🏆 ${names[0]} wins with ${fmt(won[0].score)}${Number.isInteger(won[0].ms) ? ` in ${timeText(won[0].ms)}` : ''}!${level ? ' The tie went to the faster time.' : ''}`;
     const sofar = book.size ? [...book.keys()].filter(k => k.startsWith(month) && k <= date) : [];
     const pts = winsTable(month, new Map([...book].filter(([k]) => sofar.includes(k))), 'points');
     const board = pts.slice(0, 10).map(e => `${e.place}. ${e.avatar} ${e.name} ${fmt(e.points)}`);
@@ -1493,7 +1522,7 @@
       ${family() ? `<p class="text-sm text-ink-soft text-center mt-4" id="fx-cloud-note" role="status">${cloudNote()}</p>` : ''}
       <p class="text-sm text-ink-soft text-center mt-2" id="fx-wins-key">${byPoints
         ? `Points add up every score in Today's challenge, so every day played counts. Only the first try each day is scored. Today's score is added at midnight.`
-        : `The top score in Today's challenge wins the day, and a tie gives each player a win. Today's winner is counted at midnight.`}</p>`;
+        : `The top score in Today's challenge wins the day. Level on points, the faster time wins; level on both, each player gets a win. Today's winner is counted at midnight.`}</p>`;
   }
 
   // The high-score tables: a ledger of ten lines per table, the newest entry marked
@@ -1506,13 +1535,13 @@
       return `<li class="fx-hrow ${r ? '' : 'empty'} ${r && i === 0 ? 'top' : ''} ${i === mine || (r && fresh.includes(r.t)) ? 'hot' : ''}">
         <span class="fx-hrank">${o}</span>
         <span class="fx-ava ${r ? '' : 'blank'}" style="--s:2.1rem" aria-hidden="true">${r ? esc(r.avatar) : ''}</span>
-        <span class="flex items-center gap-2 min-w-0"><span class="fx-clip whitespace-nowrap min-w-0 ${r ? 'font-medium' : ''}">${r ? esc(r.name) : '· · ·'}</span>${r && r.perfect ? STAR : ''}${r && r.clock ? '<span class="fx-label flex-none">clock</span>' : ''}</span>
+        <span class="flex items-center gap-2 min-w-0"><span class="fx-clip whitespace-nowrap min-w-0 ${r ? 'font-medium' : ''}">${r ? esc(r.name) : '· · ·'}</span>${r && r.perfect ? STAR : ''}${r && r.clock ? '<span class="fx-label flex-none">clock</span>' : ''}${r && tab === 'daily' && Number.isInteger(r.ms) ? `<span class="fx-label flex-none fx-rtime">${timeText(r.ms)}</span>` : ''}</span>
         <span class="fx-num text-lg">${r ? fmt(r.score) : ''}</span>
       </li>`;
     }).join('');
     const sub = wins ? 'Daily wins' : tab === 'daily' ? `Today's challenge · ${todayLabel()}` : POOLS[tab].label;
     const foot = mine >= 0 ? `${esc(P.name)} takes ${ORD[mine]} place.`
-      : list.length ? (tab === 'daily' ? 'The top score at midnight wins the day.' : 'Beat a score here to enter the table.')
+      : list.length ? (tab === 'daily' ? `The top score at midnight wins the day${dayTimed() ? '; level on points, the faster time' : ''}.` : 'Beat a score here to enter the table.')
       : tab === 'daily' ? 'Nobody has played today yet.' : 'No scores yet. Finish a round to enter the table.';
     const tabBtn = (v, label) => `<button type="button" class="fx-pick" data-act="tab" data-v="${v}" aria-pressed="${tab === v}">${label}</button>`;
     return `<main class="fx-sheet mx-auto max-w-xl">
@@ -1684,7 +1713,7 @@
     const q = S.q, c = C[q.a2];
     return `<figure class="fx-plate">
       <div class="flex justify-between gap-3 fx-label"><span>Flag ${String(S.i + 1).padStart(2, '0')}</span><span id="fx-pos"></span></div>
-      ${S.clock ? `<div class="fx-clock" aria-hidden="true"><i id="fx-clock-bar"></i></div>` : ''}
+      ${S.limit ? `<div class="fx-clock" aria-hidden="true"><i id="fx-clock-bar"></i></div>` : ''}
       <div class="fx-flagbox">
         <img class="fx-flag" style="--ar:${c.ar}" data-flag="${q.a2}" alt="The flag to identify">
         <div class="fx-seal">${COMPASS(56)}<span class="fx-label">Sealed until you decide</span></div>
@@ -1787,7 +1816,7 @@
     const won = e.bonus === 'won';
     return `<div class="flex items-center gap-4 mt-3 min-h-[5.6rem]" role="status">
         <span class="fx-stamp ${won ? 'bonus' : 'no'}">Bonus<br>${won ? '+' + BONUS : '0'}</span>
-        <p class="text-[.97rem] leading-snug min-w-0">${won ? `Right. That makes <b>${fmt(entryTotal(e))}</b> for this flag.` : `The answer was <b>${esc(b.options[b.answer])}</b>. You keep the ${fmt(entryTotal(e))} for the flag.`}</p>
+        <p class="text-[.97rem] leading-snug min-w-0">${won ? `Right. That makes <b>${fmt(entryTotal(e))}</b> for this flag.` : `${b.pick === null ? 'Out of time. ' : ''}The answer was <b>${esc(b.options[b.answer])}</b>. You keep the ${fmt(entryTotal(e))} for the flag.`}</p>
       </div>
       <div class="grid grid-cols-2 gap-2 mt-3">${b.options.map((t, i) => optBtn(t, i, i === b.answer ? 'right' : i === b.pick ? 'wrong' : 'dim', 'bonus-answer')).join('')}</div>
       ${facts(c)}${nextBtn()}`;
@@ -1850,7 +1879,7 @@
   function shareText() {
     const t = totals(S.log);
     const grid = S.round.map((_, i) => { const e = S.log[i]; return !e ? '⬜' : !e.ok ? '🟥' : e.hints.length ? '🟨' : '🟩'; }).join('');
-    return `Flag Explorer · ${todayLabel()}\n${P.avatar} ${P.name} scored ${fmt(S.score)}\n${grid}\nBonus questions ${t.bonusWon} of ${S.round.length} · best streak ${S.topStreak}${S.perfect ? '\n⭐ Perfect round' : ''}`;
+    return `Flag Explorer · ${todayLabel()}\n${P.avatar} ${P.name} scored ${fmt(S.score)}${S.limit && S.mode === 'daily' ? ` in ${timeText(S.ms || 0)}` : ''}\n${grid}\nBonus questions ${t.bonusWon} of ${S.round.length} · best streak ${S.topStreak}${S.perfect ? '\n⭐ Perfect round' : ''}`;
   }
 
   // What a round added to the passport, and how close the next finish line is
@@ -1887,6 +1916,7 @@
         <h1 class="fx-h text-4xl sm:text-5xl mt-1">${rankFor(S.score)}</h1>
         <p class="font-script text-lg mt-1">the rank earned by ${esc(P.name)}</p>`}
         <p class="mt-3 flex items-baseline gap-2"><span class="fx-num text-5xl leading-none">${fmt(S.score)}</span><span class="fx-label">points</span></p>
+        ${daily && S.limit ? `<p class="fx-label mt-2" id="fx-time">Time <span class="fx-num">${timeText(S.ms || 0)}</span> · breaks a tie</p>` : ''}
         ${S.place ? `<p class="mt-5"><span class="fx-stamp bonus">${daily ? `Today's table` : 'High score'}<br>${ORD[S.place - 1]} place</span></p>` : ''}
         ${S.newBest ? `<p class="fx-label mt-4" style="color:var(--ochre)">New personal best</p>` : ''}
         ${S.practice ? `<p class="fx-label mt-4">Practice replay: not recorded</p>` : ''}
@@ -1982,14 +2012,16 @@
   function clockStop() { if (clockId) { clearInterval(clockId); clockId = null; } }
   function clockTick() {
     const q = S.q;
-    if (S.screen !== 'play' || !q || q.phase !== 'guess') return clockStop();
-    const left = CLOCK - (Date.now() - q.t0) / 1000, secs = Math.max(0, Math.ceil(left));
+    if (S.screen !== 'play' || !q || !clockPhase()) return clockStop();
+    const left = S.limit - (Date.now() - q.t0) / 1000, secs = Math.max(0, Math.ceil(left));
     const bar = app.querySelector('#fx-clock-bar'), pos = app.querySelector('#fx-pos');
-    if (bar) { bar.style.transform = `scaleX(${Math.max(0, left / CLOCK)})`; bar.parentNode.classList.toggle('low', left <= 5); }
+    if (bar) { bar.style.transform = `scaleX(${Math.max(0, left / S.limit)})`; bar.parentNode.classList.toggle('low', left <= 5); }
     if (pos) pos.textContent = secs + ' s';
     if (secs !== lastSecs) { lastSecs = secs; if (secs <= 5 && secs > 0) SFX.tick(); }
-    if (left <= 0) { clockStop(); answer(null); render(true); }
+    if (left <= 0) { clockStop(); if (q.phase === 'bonus') answerBonus(null); else answer(null); render(true); }
   }
+  // Whether the clock is running: on every flag of a timed round, and on Today's challenge's bonus questions too.
+  const clockPhase = () => !!(S.limit && S.q && (S.q.phase === 'guess' || (S.q.phase === 'bonus' && bonusTimed())));
 
   // A long word in an answer steps down a size until it fits on its line, so no name is ever split mid-word.
   function fitOpts() {
@@ -2027,7 +2059,7 @@
       app.querySelector('#fx-pos').textContent = revealed ? coords(c) : sealed ? 'Final flag' : 'Destination unknown';
       app.querySelector('#fx-panel').innerHTML = viewPanel();
       app.querySelector('#fx-log').innerHTML = viewLog();
-      if (S.clock && q.phase === 'guess') { if (!clockId) { lastSecs = -1; clockId = setInterval(clockTick, 100); } clockTick(); } else clockStop();
+      if (clockPhase()) { if (!clockId) { lastSecs = -1; clockId = setInterval(clockTick, 100); } clockTick(); } else clockStop();
     }
     hydrate(app);
     fitOpts();
@@ -2163,7 +2195,7 @@
     else if (act === 'wager') { setWager(+el.dataset.v); SFX.tap(); focus = false; }
     else if (act === 'hint') { useHint(el.dataset.id); focus = false; }
     else if (act === 'answer') answer(S.q.options[+el.dataset.i]);
-    else if (act === 'bonus') { S.q.phase = 'bonus'; focus = false; }
+    else if (act === 'bonus') { beginBonus(); focus = false; }
     else if (act === 'bonus-answer') answerBonus(+el.dataset.i);
     else if (act === 'next') { next(); top = true; }
     else if (act === 'end-early') { if (S.confirmEnd) { if (S.party) endMatch(); else finish(); top = true; } else { S.confirmEnd = true; focus = false; } }
@@ -2210,7 +2242,8 @@
       if (S.q && S.q.phase === 'guess') S.q.t0 = Date.now();
     } else if (live && !s.party) {
       S = s; P = saved.P || store.get('fx-player', null) || { name: 'Explorer', avatar: '🦊' };
-      if (S.q && S.q.phase === 'guess') S.q.t0 = Date.now();
+      // Today's clock keeps running while the app is closed, so leaving to look an answer up gains nothing. Free play's clock starts the flag again.
+      if (S.q && S.q.phase === 'guess' && !(S.mode === 'daily' && S.limit)) S.q.t0 = Date.now();
     } else startScreen();
     render(false);
   }
@@ -2218,6 +2251,6 @@
   if (hot && hot.snapshot) hot.snapshot(() => ({ S, P, M }));
   if (hot && hot.ready) hot.ready(data => boot(data || liveSaved())); else boot((hot && hot.data) || liveSaved());
 
-  window.__fx = { experts, achieved, newMarks, stillMissing, passportDone, featsOn, CONT_CODES, POOL, dayText, winsTable, daysBook, dayShift, family, cloudSync, cloudState, pidOf, perfects, deck, markSeen, seenList, get match() { return M; }, standings, fitOpts, get sound() { return { ac, master, keepAlive, IOS }; }, ppPages, flagWorth, streakBonus, speedBonus, totals, entryTotal, get state() { return S; }, get player() { return P; }, get opts() { return O; }, C, POOLS, KNOWN, buildRound, tableRows, stamps, shareText, todayKey, AVATARS };
+  window.__fx = { timeText, dayWinners, DAY_CLOCK, DAY_CLOCK_FROM, byScore, experts, achieved, newMarks, stillMissing, passportDone, featsOn, CONT_CODES, POOL, dayText, winsTable, daysBook, dayShift, family, cloudSync, cloudState, pidOf, perfects, deck, markSeen, seenList, get match() { return M; }, standings, fitOpts, get sound() { return { ac, master, keepAlive, IOS }; }, ppPages, flagWorth, streakBonus, speedBonus, totals, entryTotal, get state() { return S; }, get player() { return P; }, get opts() { return O; }, C, POOLS, KNOWN, buildRound, tableRows, stamps, shareText, todayKey, AVATARS };
 })();
 </script>

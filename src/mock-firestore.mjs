@@ -11,7 +11,8 @@ export function startMock() {
   const isInt = x => Number.isInteger(x), isStr = x => typeof x === 'string';
   const goodName = d => isStr(d.name) && d.name.length > 0 && [...d.name].length <= 14 && isStr(d.avatar) && d.avatar.length <= 16;
   const SCORE_KEYS = ['name', 'avatar', 'score', 'streak', 'clock', 'perfect', 't'], PLAYER_KEYS = ['name', 'avatar', 'stamps', 'perfect', 'updated', 'best_world', 'best_known', 'best_daily', 'streak_world', 'streak_known', 'streak_daily'];
-  const goodScore = d => Object.keys(d).every(k => SCORE_KEYS.includes(k)) && SCORE_KEYS.every(k => k in d) && goodName(d) && isInt(d.score) && d.score >= 0 && d.score <= 2300 && isInt(d.streak) && d.streak >= 0 && d.streak <= 10 && typeof d.clock === 'boolean' && typeof d.perfect === 'boolean' && isInt(d.t) && d.t > 0;
+  const goodScore = d => Object.keys(d).every(k => SCORE_KEYS.includes(k) || (k === 'ms' && !state.oldRules)) && SCORE_KEYS.every(k => k in d)
+    && (!('ms' in d) || (isInt(d.ms) && d.ms >= 0 && d.ms <= 3600000)) && goodName(d) && isInt(d.score) && d.score >= 0 && d.score <= 2300 && isInt(d.streak) && d.streak >= 0 && d.streak <= 10 && typeof d.clock === 'boolean' && typeof d.perfect === 'boolean' && isInt(d.t) && d.t > 0;
   const goodPlayer = d => Object.keys(d).every(k => PLAYER_KEYS.includes(k)) && goodName(d) && (!('stamps' in d) || (Array.isArray(d.stamps) && d.stamps.length <= 250)) && (!('perfect' in d) || (Array.isArray(d.perfect) && d.perfect.length <= 3000));
   // what the rules allow: returns 'read' / 'create' / 'write' permissions for a document path
   function rule(path) {
@@ -24,7 +25,7 @@ export function startMock() {
   }
   const send = (res, status, body) => { res.writeHead(status, { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'access-control-allow-headers': 'content-type', 'access-control-allow-methods': 'GET,POST,PATCH,OPTIONS' }); res.end(JSON.stringify(body)); };
   const fail = (res, status, code) => send(res, status, { error: { code: status, status: code, message: code } });
-  const state = { down: false, requests: 0, withKey: 0, noKey: 0, validKey: null, keyRequired: false, refusePlayers: false };
+  const state = { down: false, requests: 0, withKey: 0, noKey: 0, validKey: null, keyRequired: false, refusePlayers: false, oldRules: false };      // oldRules: the rules as they were before the daily clock, with no 'ms'
   let tick = 0;
   const stamp = () => new Date(Date.now() + ++tick).toISOString();          // every save gets a time of its own
   const server = http.createServer((req, res) => {
