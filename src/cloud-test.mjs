@@ -127,8 +127,8 @@ const who = p => p.evaluate(() => ({ ...window.__fx.player }));
 const playerDoc = (fid, pid) => { const d = mock.docs.get(`families/${fid}/players/${pid}`); return d ? mock.plain(d) : null; };
 const E = await device('E'); await join(E, 'two-devices-1'); const fid2 = (await E.evaluate(() => window.__fx.family())).fid;
 await enter(E, 'Casey'); const face = (await who(E)).avatar; await sync(E);
-eq(playerDoc(fid2, 'casey').avatar, face, 'the family holds the picture chosen on the first device'); await round(E, 'free'); await sync(E);
-eq(playerDoc(fid2, 'casey').stamps.length, 10, 'and the passport after a round'); eq(playerDoc(fid2, 'casey').best_world, 1680, 'and the personal best');
+eq(playerDoc(fid2, 'casey'), null, 'no record before the first round'); await round(E, 'free'); await sync(E);
+eq(playerDoc(fid2, 'casey').avatar, face, 'the family holds the picture chosen on the first device'); eq(playerDoc(fid2, 'casey').stamps.length, 10, 'and the passport after a round'); eq(playerDoc(fid2, 'casey').best_world, 1680, 'and the personal best');
 // second device joins first, then types the name: it is asked, and saying yes brings the picture
 const F = await device('F'); await join(F, 'two-devices-1'); await F.fill('#fx-name', 'casey'); await F.click('#fx-setup [type=submit]'); await F.waitForSelector('#fx-claim');
 assert((await txt(F, '#fx-claim')).includes(face), 'the question shows the picture the family knows'); await F.screenshot({ path: 'c8-claim-picture.png', fullPage: true });
@@ -162,6 +162,15 @@ eq((await boardRows(H, 'world')).rows.length, 2, 'and the family’s scores stil
 await H.click('[data-act=board]'); assert((await txt(H, '#fx-cloud-note')).includes('Scores are shared with your family'), 'the status line says the scores are shared'); await H.click('[data-act=back]');
 await H.click('[data-act=change-player]'); await H.click('[data-act=family]'); assert((await txt(H, '#fx-cloud-detail')).includes('player morgan: write 403'), 'the family screen says what was refused'); await H.screenshot({ path: 'c9-family-problem.png', fullPage: true }); await H.click('[data-act=back]');
 mock.state.refusePlayers = false; await sync(H); eq(playerDoc(fid2, 'morgan').stamps.length, 9, 'once records can be saved again, the passport goes up'); eq(await H.evaluate(() => window.__fx.cloudState.problems.length), 0, 'and the problem clears');
+
+// a name typed but never played gets no family record, so one deleted in the Firebase console stays deleted
+const Q = await device('Q'); await join(Q, 'ghost-family'); const fidQ = (await Q.evaluate(() => window.__fx.family())).fid;
+await enter(Q, 'Ghost'); await sync(Q); eq(playerDoc(fidQ, 'ghost'), null, 'a name with nothing played makes no record');
+mock.docs.set(`families/${fidQ}/players/ghost`, { fields: { name: { stringValue: 'Ghost' }, avatar: { stringValue: '🦊' } }, createTime: 'x', updateTime: 'x' });
+await sync(Q); eq(playerDoc(fidQ, 'ghost').name, 'Ghost', 'an existing record is left alone');
+mock.docs.delete(`families/${fidQ}/players/ghost`); await sync(Q); eq(playerDoc(fidQ, 'ghost'), null, 'deleted in the console, it is not put back');
+await Q.evaluate(() => { const p = JSON.parse(localStorage.getItem('fx-passport') || '{}'); p.ghost = ['FR']; localStorage.setItem('fx-passport', JSON.stringify(p)); });
+await sync(Q); eq(playerDoc(fidQ, 'ghost') && playerDoc(fidQ, 'ghost').stamps.join(), 'FR', 'once the player has something to save, the record is made');
 
 await browser.close(); mock.close();
 console.log(errors.length ? errors.join('\n') : 'FAMILY SCOREBOARD CHECKS PASSED');

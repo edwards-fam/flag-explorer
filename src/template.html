@@ -892,6 +892,9 @@
     const pid = pidOf(who.name), key = plain(who.name), where = `families/${f.fid}/players/`;
     const doc = await fsGet(where + encodeURIComponent(pid)), d = doc ? fsDoc(doc) : {};
     const playedHere = stamps(who.name).length > 0 || ['world', 'known', 'daily'].some(t => bestFor(t, who.name).score > 0);
+    // A name the family has no record of and that has nothing to save here (typed but never played) gets no record:
+    // a name entered by mistake stays off the family's list, and a record deleted in the Firebase console stays deleted.
+    if (!doc && !playedHere && !perfects(who.name).length && !experts(who.name).length) return;
     // down: stamps, gold stamps and bests the family has and this device does not
     const all = store.get('fx-passport', {}), have = all[key] || [], extra = texts(d.stamps).filter(a => C[a] && !have.includes(a));
     if (extra.length) { all[key] = [...have, ...extra]; store.set('fx-passport', all); }
