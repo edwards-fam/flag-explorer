@@ -836,11 +836,13 @@
   const plats = name => store.get('fx-plat', {})[plain(name)] || [];
   const diams = name => store.get('fx-diam', {})[plain(name)] || [];
   const allIn = list => { const have = new Set(list); return POOL.every(a => have.has(a)); };
-  // The level a player is working on: 0 stamps, 1 expert stars, 2 platinum, 3 diamond, 4 every level complete.
+  // The level a player is working on: 0 stamps, 1 gold stars, 2 platinum, 3 diamond, 4 every level complete.
+  // Shown as Expert (every country stamped), Gold (every flag with no hints), Platinum and Diamond. Inside the game the
+  // first two keep their original keys: 'world' for the Expert passport, 'expert' for the Gold passport.
   function tier(name) { if (!passportDone(name)) return 0; if (!allIn(experts(name))) return 1; if (!allIn(plats(name))) return 2; if (!allIn(diams(name))) return 3; return 4; }
   const LEVELS = [
-    { key: 'world', list: stamps, one: 'stamp', many: 'stamps', goal: 'a gold passport', title: 'passport', label: '🛂 Passport', link: '' },
-    { key: 'expert', list: experts, one: 'expert star', many: 'expert stars', goal: 'the Expert passport', title: 'Expert passport', label: '★ Expert passport', link: '★ ' },
+    { key: 'world', list: stamps, one: 'stamp', many: 'stamps', goal: 'the Expert passport', title: 'Expert passport', label: '🛂 Passport', link: '' },
+    { key: 'expert', list: experts, one: 'gold star', many: 'gold stars', goal: 'the Gold passport', title: 'Gold passport', label: '★ Gold passport', link: '★ ' },
     { key: 'platinum', list: plats, one: 'platinum star', many: 'platinum stars', goal: 'the Platinum passport', title: 'Platinum passport', label: '✦ Platinum passport', link: 'Platinum ' },
     { key: 'diamond', list: diams, one: 'diamond', many: 'diamonds', goal: 'the Diamond passport', title: 'Diamond passport', label: '💎 Diamond passport', link: '💎 ' }];
   const levelHave = (name, lv) => LEVELS[lv].list(name).filter(a => C[a]).length;
@@ -855,7 +857,7 @@
   // Milestones reached, each kept with the moment it was reached: 'c0' to 'c5' for the continents, 'world', 'expert', 'platinum', 'diamond'.
   const FINISHES = ['world', 'expert', 'platinum', 'diamond'];
   const headline = keys => keys.some(k => FINISHES.includes(k)) ? keys.filter(k => k[0] !== 'c') : keys;
-  const featName = key => key === 'world' ? 'the passport' : FINISHES.includes(key) ? `the ${key[0].toUpperCase() + key.slice(1)} passport` : CONTS[+key.slice(1)];
+  const featName = key => key === 'world' ? 'the Expert passport' : key === 'expert' ? 'the Gold passport' : FINISHES.includes(key) ? `the ${key[0].toUpperCase() + key.slice(1)} passport` : CONTS[+key.slice(1)];
   const marks = name => store.get('fx-marks', {})[plain(name)] || {};
   function achieved(name) {
     const have = new Set(stamps(name)), ex = new Set(experts(name)), out = [];
@@ -1635,7 +1637,7 @@
     }
     return out.sort((a, b) => a.t - b.t);
   }
-  const featLine = x => x.key === 'world' ? `🌍 ${x.name} stamped every country in the passport!` : x.key === 'expert' ? `⭐ ${x.name} completed the Expert passport!`
+  const featLine = x => x.key === 'world' ? `🌍 ${x.name} stamped every country and earned the Expert passport!` : x.key === 'expert' ? `🥇 ${x.name} completed the Gold passport!`
     : x.key === 'platinum' ? `✦ ${x.name} completed the Platinum passport!` : x.key === 'diamond' ? `💎 ${x.name} completed the Diamond passport!` : `🗺️ ${x.name} completed ${CONTS[+x.key.slice(1)]}!`;
   function dayText(date, book = daysBook()) {
     const rows = [...(book.get(date) || [])].sort(byScore), won = dayWinners(rows);
@@ -1789,7 +1791,7 @@
             ${f('Nationality / Nationalité', 'Explorer of the world')}
             ${f('Flags stamped', `${pg.total} of ${POOL.length}`)}
             ${f('Continents reached', `${conts} of ${CONTS.length}${full ? ` · ${full} complete` : ''}`)}
-            ${done ? f('Expert stars', `${experts(P.name).length} of ${POOL.length}`) : ''}
+            ${done ? f('Gold stars', `${experts(P.name).length} of ${POOL.length}`) : ''}
             ${tier(P.name) >= 2 ? f('Platinum stars', `${plats(P.name).length} of ${POOL.length}`) : ''}
             ${tier(P.name) >= 3 ? f('Diamonds', `${diams(P.name).length} of ${POOL.length}`) : ''}
           </div>
@@ -1831,18 +1833,18 @@
       <span class="fx-label whitespace-nowrap">Page ${n} of ${len - 1}</span>
       <button class="fx-quiet whitespace-nowrap" data-act="pp-next" ${n >= len - 1 ? 'disabled style="visibility:hidden"' : ''}>Next</button>`;
   const LEVEL_RULE = [`A flag is stamped the first time you name it correctly, in any recorded game. Complete a continent, then the whole world.`,
-    `Passport complete. A gold star goes on a stamp the first time you name that flag with no hints. Star all ${POOL.length} for the Expert passport.`,
-    `Expert passport complete. A platinum star goes on a stamp when you name that flag with no hints and answer its bonus question. Earn all ${POOL.length} for the Platinum passport.`,
+    `Expert passport complete. A gold star goes on a stamp the first time you name that flag with no hints. Star all ${POOL.length} for the Gold passport.`,
+    `Gold passport complete. A platinum star goes on a stamp when you name that flag with no hints and answer its bonus question. Earn all ${POOL.length} for the Platinum passport.`,
     `Platinum passport complete. A diamond goes on a stamp when you name that flag with no hints in ${DIAMOND_SECS} seconds or less. Earn all ${POOL.length} for the Diamond passport.`,
-    `Every level complete: gold, Expert, Platinum and Diamond. The whole world, known in a flash.`];
-  // The cover for each level: navy, then gold, starry Expert, brushed platinum and sparkling diamond.
+    `Every level complete: Expert, Gold, Platinum and Diamond. The whole world, known in a flash.`];
+  // The cover for each level: navy, then starry Expert, gold, brushed platinum and sparkling diamond.
   function coverHTML(t) {
-    const cls = ['', ' gold', ' expert', ' platinum', ' diamond'][Math.min(t, 4)], sub = ['', 'Every country stamped', 'Expert · every flag mastered', 'Platinum · every country known', 'Diamond · lightning recall'][Math.min(t, 4)];
+    const cls = ['', ' expert', ' gold', ' platinum', ' diamond'][Math.min(t, 4)], sub = ['', 'Expert · every country stamped', 'Gold · every flag, no hints', 'Platinum · every country known', 'Diamond · lightning recall'][Math.min(t, 4)];
     return `<div class="pp-cover${cls}"><span class="pp-cover-t">Passport</span>${EMBLEM}<span class="pp-cover-b">Flag Explorer${sub ? `<small>${sub}</small>` : ''}</span></div>`;
   }
   function viewPassport() {
     const t = tier(P.name), lv = Math.min(t, 3), pages = ppPages(), done = lv > 0, total = lv ? levelHave(P.name, lv) : pages[1].total;
-    const unit = ['stamped', 'expert stars', 'platinum stars', 'diamonds'][lv], tone = ['', 'var(--gold)', '#9AA3AF', '#3BA9DC'][lv];
+    const unit = ['stamped', 'gold stars', 'platinum stars', 'diamonds'][lv], tone = ['', 'var(--gold)', '#9AA3AF', '#3BA9DC'][lv];
     S.pp = Math.min(S.pp || 0, pages.length - 1);
     return `<main class="fx-sheet mx-auto max-w-xl">
       <div class="fx-band flex items-end justify-between gap-3">
@@ -2085,9 +2087,9 @@
     // the countdown: a step of five crossed from 75 to go, then every round in the last stretch
     const step = Math.ceil(left / 5) * 5, crossed = left > 0 && left < s.left0 && step < s.left0 && step <= COUNTDOWN;
     const count = left && left <= LAST_STRETCH ? `Only ${left} to go for ${L.goal}. Free play now deals ${left === 1 ? 'it' : 'them'} more often.`
-      : crossed ? `${left} ${left === 1 ? L.one.replace(/^(expert|platinum) /, '') : L.many.replace(/^(expert|platinum) /, '')} to go for ${L.goal}!` : '';
-    const intro = !s.intro ? '' : [`Every flag you name earns a stamp in your passport. Stamp all ${POOL.length} countries for a gold passport.`,
-      `Name a flag with no hints and its stamp earns a gold star. Star all ${POOL.length} for the Expert passport.`,
+      : crossed ? `${left} ${left === 1 ? L.one.replace(/^(gold|platinum) /, '') : L.many.replace(/^(gold|platinum) /, '')} to go for ${L.goal}!` : '';
+    const intro = !s.intro ? '' : [`Every flag you name earns a stamp in your passport. Stamp all ${POOL.length} countries for the Expert passport.`,
+      `Name a flag with no hints and its stamp earns a gold star. Star all ${POOL.length} for the Gold passport.`,
       `Name a flag with no hints and answer its bonus question for a platinum star. Earn all ${POOL.length} for the Platinum passport.`,
       `Name a flag with no hints in ${DIAMOND_SECS} seconds or less for a diamond. Earn all ${POOL.length} for the Diamond passport.`][t0];
     return `<button type="button" class="fx-pstrip t${t0} ${t0 || !left ? 'gold' : ''}" data-act="passport" id="fx-pstrip" aria-label="Open your passport. ${esc(news)}. ${have} of ${POOL.length}.">
@@ -2099,10 +2101,10 @@
       </button>`;
   }
   function featBlock(key) {
-    if (key === 'world') return `<div class="fx-feat big" id="fx-feat-world"><p class="fx-label">Every country in the world</p><h2>🌍 Passport complete</h2>
-      <p>All ${POOL.length} flags are stamped. Your passport cover is now gold.</p>
-      <p><b class="font-semibold">Next, the Expert passport:</b> every flag you name with no hints now earns a gold star on its stamp. Star all ${POOL.length} to finish it.</p></div>`;
-    if (key === 'expert') return `<div class="fx-feat big" id="fx-feat-expert"><p class="fx-label">Every flag, not one hint</p><h2>★ Expert passport complete</h2>
+    if (key === 'world') return `<div class="fx-feat big" id="fx-feat-world"><p class="fx-label">Every country in the world</p><h2>🌍 Expert passport complete</h2>
+      <p>All ${POOL.length} flags are stamped. Your passport has its Expert cover.</p>
+      <p><b class="font-semibold">Next, the Gold passport:</b> every flag you name with no hints now earns a gold star on its stamp. Star all ${POOL.length} to finish it.</p></div>`;
+    if (key === 'expert') return `<div class="fx-feat big" id="fx-feat-expert"><p class="fx-label">Every flag, not one hint</p><h2>🥇 Gold passport complete</h2>
       <p>You have named all ${POOL.length} flags without a single hint. The whole world, mastered.</p>
       <p><b class="font-semibold">Next, the Platinum passport:</b> name a flag with no hints and answer its bonus question for a platinum star.</p></div>`;
     if (key === 'platinum') return `<div class="fx-feat big" id="fx-feat-platinum"><p class="fx-label">Every flag and its bonus question</p><h2>✦ Platinum passport complete</h2>
@@ -2123,22 +2125,22 @@
     const n = (list, one) => list.length ? plural(list.length, one) : '';
     let body;
     if (keys.includes('diamond')) body = `${cover(4)}<p class="fx-label">Every flag in ${DIAMOND_SECS} seconds</p><h2 id="fx-cheer-h">Diamond passport!</h2>
-      <p>${name}, you have named all ${POOL.length} flags, with no hints, in ${DIAMOND_SECS} seconds or less. Every level of the passport is complete: gold, Expert, Platinum and Diamond. The whole world, known in a flash.</p>${buttons('See my Diamond passport')}`;
+      <p>${name}, you have named all ${POOL.length} flags, with no hints, in ${DIAMOND_SECS} seconds or less. Every level of the passport is complete: Expert, Gold, Platinum and Diamond. The whole world, known in a flash.</p>${buttons('See my Diamond passport')}`;
     else if (keys.includes('platinum')) body = `${cover(3)}<p class="fx-label">Every flag and its bonus question</p><h2 id="fx-cheer-h">Platinum passport!</h2>
       <p>${name}, you know every country, not just its flag. Your passport is now platinum.</p>${next(`What's next: the Diamond passport`, DIAM, n(diams(P.name), 'diamond'))}${buttons('See my Platinum passport')}`;
-    else if (keys.includes('expert')) body = `${cover(2)}<p class="fx-label">Every flag, not one hint</p><h2 id="fx-cheer-h">Expert passport complete</h2>
-      <p>${name}, you have named all ${POOL.length} flags without a single hint. Every stamp carries a gold star, and your passport has a new Expert cover.</p>${next(`What's next: the Platinum passport`, PLAT, n(plats(P.name), 'platinum star'))}${buttons('See my Expert passport')}`;
+    else if (keys.includes('expert')) body = `${cover(2)}<p class="fx-label">Every flag, not one hint</p><h2 id="fx-cheer-h">Gold passport!</h2>
+      <p>${name}, you have named all ${POOL.length} flags without a single hint. Every stamp carries a gold star, and your passport is now gold.</p>${next(`What's next: the Platinum passport`, PLAT, n(plats(P.name), 'platinum star'))}${buttons('See my Gold passport')}`;
     else if (keys.includes('lv-platinum')) body = `${cover(2)}<p class="fx-label">New in your passport</p><h2 id="fx-cheer-h">The Platinum passport</h2>
-      <p>${name}, your Expert passport has a new cover, and a new level is open.</p>${next('How to earn it', PLAT, n(plats(P.name), 'platinum star'))}
-      <p class="text-sm text-ink-soft">After Platinum comes one more level: the Diamond passport.</p>${buttons('See my Expert passport')}`;
+      <p>${name}, your passport is now Gold, and a new level is open: Platinum.</p>${next('How to earn it', PLAT, n(plats(P.name), 'platinum star'))}
+      <p class="text-sm text-ink-soft">After Platinum comes one more level: the Diamond passport.</p>${buttons('See my Gold passport')}`;
     else if (keys.includes('lv-diamond')) body = `${cover(3)}<p class="fx-label">New in your passport</p><h2 id="fx-cheer-h">The Diamond passport</h2>
       <p>${name}, a new level is open.</p>${next('How to earn it', DIAM, n(diams(P.name), 'diamond'))}${buttons('See my Platinum passport')}`;
-    else if (keys.includes('world')) body = `${cover(1)}<p class="fx-label">Every country in the world</p><h2 id="fx-cheer-h">Gold passport!</h2>
-      <p>${name}, you have stamped all ${POOL.length} countries. Your passport is complete and its cover is now gold.</p>
-      ${next(`What's next: the Expert passport`, `Every flag you name with <b>no hints</b> now earns a gold star on its stamp. Star all ${POOL.length} to complete it.`, n(experts(P.name), 'star'))}${buttons('See my gold passport')}`;
+    else if (keys.includes('world')) body = `${cover(1)}<p class="fx-label">Every country in the world</p><h2 id="fx-cheer-h">Expert passport!</h2>
+      <p>${name}, you have stamped all ${POOL.length} countries. Your passport is complete and has its Expert cover.</p>
+      ${next(`What's next: the Gold passport`, `Every flag you name with <b>no hints</b> now earns a gold star on its stamp. Star all ${POOL.length} to complete it.`, n(experts(P.name), 'gold star'))}${buttons('See my Expert passport')}`;
     else { const names = keys.map(k => CONTS[+k.slice(1)]), flags = keys.reduce((n, k) => n + CONT_CODES[+k.slice(1)].length, 0), have = stamps(P.name).filter(a => C[a]).length;
       body = `${cover(0)}<p class="fx-label">Passport milestone</p><h2 id="fx-cheer-h">🗺️ ${listOf(names)} complete</h2>
-      <p>${name}, every one of ${keys.length > 1 ? `their ${flags}` : `its ${flags}`} flags is stamped in your passport. ${have} of ${POOL.length} countries so far; stamp them all for a gold passport.</p>${buttons('See my passport')}`; }
+      <p>${name}, every one of ${keys.length > 1 ? `their ${flags}` : `its ${flags}`} flags is stamped in your passport. ${have} of ${POOL.length} countries so far; stamp them all for the Expert passport.</p>${buttons('See my passport')}`; }
     return `<div class="fx-cheer" role="dialog" aria-modal="true" aria-labelledby="fx-cheer-h" id="fx-cheer"><div class="fx-cheer-card">${body}</div></div>`;
   }
   // The passport link under Choose your game: progress, or the countdown once the finish line is within 75.

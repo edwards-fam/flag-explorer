@@ -49,16 +49,16 @@ let s = await st(A); assert(s.round.some(r => r.a2 === X), 'the last stretch dea
 eq(JSON.stringify(s.feats), JSON.stringify(['c5', 'world']), 'Oceania and the whole passport complete together');
 eq(await A.locator('[data-feat=c5]').count(), 1, 'Oceania announced'); eq(await A.locator('#fx-feat-world').count(), 1, 'the full passport announced');
 assert(s.newExpert >= 1, 'the flag that completed the passport, named with no hints, already earns an expert star');
-eq(await A.locator('#fx-cheer').count(), 1, 'the full passport takes the whole screen'); assert((await txt(A, '#fx-cheer')).includes('Gold passport!') && (await txt(A, '#fx-cheer')).includes('What\'s next: the Expert passport'), 'and explains what comes next');
+eq(await A.locator('#fx-cheer').count(), 1, 'the full passport takes the whole screen'); assert((await txt(A, '#fx-cheer')).includes('Expert passport!') && (await txt(A, '#fx-cheer')).includes('What\'s next: the Gold passport'), 'and explains what comes next');
 eq(await A.evaluate(() => document.activeElement && document.activeElement.dataset.act), 'cheer-passport', 'its button has the focus');
 await A.screenshot({ path: 'p8-gold-cheer.png' }); await A.click('[data-act=cheer-close]'); eq(await A.locator('#fx-cheer').count(), 0, 'Keep playing closes it');
-assert((await txt(A, '#fx-stamp-note')).includes('1 new stamp · passport complete!'), 'the passport strip reports the last stamp');
+assert((await txt(A, '#fx-stamp-note')).includes('1 new stamp · Expert passport complete!'), 'the passport strip reports the last stamp');
 await A.screenshot({ path: 'p1-passport-complete.png', fullPage: true }); await overflow(A, 'passport complete');
 eq(JSON.stringify(Object.keys(await fx(A, 'newMarks', 'Alex'))), '[]', 'a milestone is celebrated once');
-await A.click('[data-act=passport]'); eq(await A.locator('.pp-cover.gold').count(), 1, 'the cover turns gold'); assert((await txt(A, '.pp-cover')).includes('Every country stamped'), 'and says why');
-assert((await txt(A, '.fx-band')).includes('expert stars'), 'the passport now counts expert stars'); await A.screenshot({ path: 'p2-gold-cover.png' });
+await A.click('[data-act=passport]'); eq(await A.locator('.pp-cover.expert').count(), 1, 'the cover turns Expert'); assert((await txt(A, '.pp-cover')).includes('Expert · every country stamped'), 'and says why');
+assert((await txt(A, '.fx-band')).includes('gold stars'), 'the passport now counts gold stars'); await A.screenshot({ path: 'p2-gold-cover.png' });
 await A.click('#pp-book'); await A.waitForTimeout(800); assert((await txt(A, '.pp-page')).includes('6 of 6 · 6 complete'), 'all six continents complete on the holder page');
-assert((await txt(A, '.pp-page')).includes('Expert stars'), 'the holder page counts expert stars'); await A.screenshot({ path: 'p3-holder.png' });
+assert((await txt(A, '.pp-page')).includes('Gold stars'), 'the holder page counts gold stars'); await A.screenshot({ path: 'p3-holder.png' });
 for (let k = 0; k < 2; k++) { await A.click('[data-act=pp-next]'); await A.waitForTimeout(800); }
 assert(/★ \d+ of 54/.test(await txt(A, '.pp-top')), 'continent pages show their expert stars'); await A.screenshot({ path: 'p6-continent-page.png' }); await A.click('[data-act=back]');
 // a flag named after a hint earns no expert star
@@ -76,11 +76,11 @@ const B = await mk('B'); const Y = POOL[100], t0 = Date.now() - 86400000;
 await seed(B, { 'fx-passport': { robin: POOL }, 'fx-expert': { robin: POOL.filter(a => a !== Y) }, 'fx-marks': { robin: { c0: t0, c1: t0, c2: t0, c3: t0, c4: t0, c5: t0, world: t0 } }, 'fx-cheered': { robin: ['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'world'] }, 'fx-people': { robin: { name: 'Robin', avatar: '🐙' } } });
 await B.reload(); await B.waitForTimeout(250); await enter(B, 'Robin'); eq(JSON.stringify(await fx(B, 'stillMissing', 'Robin')), JSON.stringify([Y]), 'one expert star missing');
 await round(B); s = await st(B); assert(s.round.some(r => r.a2 === Y), 'the missing star’s flag is dealt'); eq(JSON.stringify(s.feats), '["expert"]', 'the Expert passport completes');
-eq(await B.locator('#fx-feat-expert').count(), 1, 'and is announced'); assert((await txt(B, '#fx-cheer')).includes('Expert passport complete'), 'on the whole screen');
+eq(await B.locator('#fx-feat-expert').count(), 1, 'and is announced'); assert((await txt(B, '#fx-cheer')).includes('Gold passport!'), 'on the whole screen');
 await B.screenshot({ path: 'p9-expert-cheer.png' }); await B.click('[data-act=cheer-passport]'); eq((await st(B)).screen, 'passport', 'its button opens the passport'); await B.click('[data-act=back]');
 await B.screenshot({ path: 'p4-expert-complete.png', fullPage: true }); await overflow(B, 'expert complete');
-await B.click('[data-act=passport]'); assert((await txt(B, '.pp-cover')).includes('Expert · every flag mastered'), 'the gold cover says so');
-assert(/\d+\s*of 197 platinum stars/.test(await txt(B, '.fx-band')), 'the passport now counts platinum stars'); eq(await B.locator('.pp-cover.expert').count(), 1, 'the Expert cover');
+await B.click('[data-act=passport]'); assert((await txt(B, '.pp-cover')).includes('Gold · every flag, no hints'), 'the gold cover says so');
+assert(/\d+\s*of 197 platinum stars/.test(await txt(B, '.fx-band')), 'the passport now counts platinum stars'); eq(await B.locator('.pp-cover.gold').count(), 1, 'the Gold cover');
 await B.screenshot({ path: 'p13-expert-cover.png' });
 
 // ---- 3. the last stretch: within 20, three missing flags a round; further away, nothing changes
@@ -105,7 +105,7 @@ for (let k = 0; k < 10; k++) {
   await E.click('[data-act=next]');
 }
 await E.waitForTimeout(200); eq((await st(E)).screen, 'match', 'the group game ends');
-assert((await txt(E, '#fx-match-feats')).includes('Alex completed') && (await txt(E, '#fx-match-feats')).includes('the passport'), 'the milestone is named on the result'); assert(!(await txt(E, '#fx-match-feats')).includes('Africa'), 'without listing every continent');
+assert((await txt(E, '#fx-match-feats')).includes('Alex completed') && (await txt(E, '#fx-match-feats')).includes('the Expert passport'), 'the milestone is named on the result'); assert(!(await txt(E, '#fx-match-feats')).includes('Africa'), 'without listing every continent');
 await E.screenshot({ path: 'p5-match-feats.png', fullPage: true }); await overflow(E, 'match feats');
 
 // ---- 5. the family: stars and milestones go up with the player, come down on another device, and reach the day summary
@@ -120,7 +120,7 @@ const G = await mk('G', { cloud: true }); await join(G, 'passport-family'); awai
 await G.waitForFunction(() => window.__fx.state.screen === 'rules'); await G.waitForFunction(() => !window.__fx.cloudState.busy);
 eq((await fx(G, 'experts', 'Morgan')).length, 7, 'the stars come down on another device'); eq(await fx(G, 'passportDone', 'Morgan'), true, 'with the full passport');
 eq(JSON.stringify(await fx(G, 'newMarks', 'Morgan')), '[]', 'and the milestones, so they are not counted again');
-await G.waitForSelector('#fx-cheer'); assert((await txt(G, '#fx-cheer')).includes('Gold passport!'), 'a device that never celebrated it shows it once');
+await G.waitForSelector('#fx-cheer'); assert((await txt(G, '#fx-cheer')).includes('Expert passport!'), 'a device that never celebrated it shows it once');
 await G.click('[data-act=cheer-close]'); await G.evaluate(() => window.__fx.cloudSync()); await G.waitForFunction(() => !window.__fx.cloudState.busy); await G.waitForTimeout(200); eq(await G.locator('#fx-cheer').count(), 0, 'and only once');
 const feats = await fx(F, 'featsOn', '2026-10-12'); eq(feats.map(x => x.key).join(), 'world', 'a full passport on the day is reported on its own, without the continents it finished');
 const H = await mk('H', { cloud: true }); await join(H, 'passport-family'); await H.evaluate(() => window.__fx.cloudSync()); await H.waitForFunction(() => !window.__fx.cloudState.busy);
@@ -133,7 +133,7 @@ const K = await mk('K'); const tK = Date.now() - 2 * 864e5;
 await seed(K, { 'fx-passport': { boo: POOL }, 'fx-marks': { boo: { c0: tK, c1: tK, c2: tK, c3: tK, c4: tK, c5: tK, world: tK } }, 'fx-people': { boo: { name: 'Boo', avatar: '🐝' } } });
 await K.evaluate(() => localStorage.removeItem('fx-cheered')); await K.reload(); await K.waitForTimeout(250);
 eq(JSON.stringify(await K.evaluate(() => JSON.parse(localStorage.getItem('fx-cheered')))), JSON.stringify({ boo: ['c0', 'c1', 'c2', 'c3', 'c4', 'c5'] }), 'on first run, continents already reached count as celebrated, the full passport does not');
-await enter(K, 'Boo'); await K.waitForSelector('#fx-cheer'); assert((await txt(K, '#fx-cheer')).includes('Gold passport!'), 'a full passport finished before this version is celebrated when the player next chooses a game');
+await enter(K, 'Boo'); await K.waitForSelector('#fx-cheer'); assert((await txt(K, '#fx-cheer')).includes('Expert passport!'), 'a full passport finished before this version is celebrated when the player next chooses a game');
 assert(!(await txt(K, '#fx-cheer')).includes('Africa'), 'without listing the continents'); await K.waitForTimeout(700); await K.screenshot({ path: 'p10-catch-up.png' }); await overflow(K, 'catch-up');
 await K.click('[data-act=cheer-close]'); await K.click('[data-act=rules-back]'); await enter(K, 'Boo'); eq(await K.locator('#fx-cheer').count(), 0, 'once only');
 // continents reached through a sync are celebrated too
@@ -144,11 +144,11 @@ await L.waitForTimeout(700); await L.screenshot({ path: 'p11-continent-cheer.png
 // ---- 7. the passport strip, the countdown from 75 to go, and the one-time introduction
 const M2 = await mk('M2'); const note = (have, s) => M2.evaluate(([h, st]) => { localStorage.setItem('fx-passport', JSON.stringify({ casey: window.__fx.POOL.slice(0, h) })); const el = document.createElement('div'); el.innerHTML = window.__fx.stampNote(st, 'Casey'); return el.textContent.replace(/\s+/g, ' ').trim(); }, [have, s]);
 const base = { practice: false, done0: false, newStamps: 2, newExpert: 0, intro: false };
-assert((await note(123, { ...base, left0: 76 })).includes('74 stamps to go for a gold passport!'), 'crossing 75 to go is announced: ' + await note(123, { ...base, left0: 76 }));
+assert((await note(123, { ...base, left0: 76 })).includes('74 stamps to go for the Expert passport!'), 'crossing 75 to go is announced: ' + await note(123, { ...base, left0: 76 }));
 assert(!(await note(124, { ...base, left0: 75 })).includes('to go'), 'within the same five, nothing more');
 assert((await note(127, { ...base, left0: 72 })).includes('70 stamps to go'), 'each five crossed is announced');
 assert(!(await note(100, { ...base, left0: 99 })).includes('to go'), 'further away than 75, no countdown');
-assert((await note(180, { ...base, left0: 19 })).includes('Only 17 to go for a gold passport'), 'the last stretch shows every round');
+assert((await note(180, { ...base, left0: 19 })).includes('Only 17 to go for the Expert passport'), 'the last stretch shows every round');
 assert((await note(50, { ...base, left0: 149 })).includes('2 new stamps') && (await note(50, { ...base, left0: 149 })).includes('50 of 197'), 'the strip counts new stamps and the passport');
 assert((await note(50, { ...base, left0: 147, newStamps: 0 })).includes('No new stamps this round'), 'and says when there are none');
 assert((await note(50, { ...base, left0: 149, intro: true })).includes('Every flag you name earns a stamp in your passport'), 'the introduction');
@@ -157,7 +157,7 @@ eq(await M2.evaluate(() => { localStorage.setItem('fx-passport', JSON.stringify(
 eq(await M2.evaluate(() => { localStorage.setItem('fx-passport', JSON.stringify({ casey: window.__fx.POOL.slice(0, 100) })); return window.__fx.ppLinkText('Casey'); }), '100 of 197', 'and shows progress before that');
 // a real round: the strip and the introduction on the results screen, once
 await M2.evaluate(() => localStorage.setItem('fx-passport', '{}')); await enter(M2, 'Casey'); await round(M2);
-assert((await txt(M2, '#fx-pstrip')).includes('10 new stamps') && (await txt(M2, '#fx-pp-intro')).includes('gold passport'), 'the first round shows the strip and the introduction');
+assert((await txt(M2, '#fx-pstrip')).includes('10 new stamps') && (await txt(M2, '#fx-pp-intro')).includes('Expert passport'), 'the first round shows the strip and the introduction');
 await M2.screenshot({ path: 'p12-strip-intro.png', fullPage: true }); await overflow(M2, 'strip');
 await M2.click('#fx-pstrip'); eq((await st(M2)).screen, 'passport', 'the strip opens the passport'); await M2.click('[data-act=back]');
 await M2.click('[data-act=choose]'); await round(M2); eq(await M2.locator('#fx-pp-intro').count(), 0, 'the introduction is shown once');
@@ -169,7 +169,7 @@ await seed(P2, { 'fx-passport': { boo: POOL }, 'fx-expert': { boo: POOL }, 'fx-m
   'fx-cheered': { boo: ['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'world', 'expert'] }, 'fx-people': { boo: { name: 'Boo', avatar: '🤓' } } }); await P2.reload(); await P2.waitForTimeout(250);
 eq(await fx(P2, 'tier', 'Boo'), 2, 'Expert complete: working on Platinum');
 await enter(P2, 'Boo'); await P2.waitForSelector('#fx-cheer'); assert((await txt(P2, '#fx-cheer')).includes('The Platinum passport') && (await txt(P2, '#fx-cheer')).includes('bonus question'), 'the new level is announced');
-eq(await P2.locator('#fx-cheer .pp-cover.expert').count(), 1, 'with the new Expert cover'); await P2.waitForTimeout(600); await P2.screenshot({ path: 'p14-platinum-open.png' }); await overflow(P2, 'platinum open');
+eq(await P2.locator('#fx-cheer .pp-cover.gold').count(), 1, 'with the Gold cover'); assert((await txt(P2, '#fx-cheer')).includes('your passport is now Gold'), 'and says so'); await P2.waitForTimeout(600); await P2.screenshot({ path: 'p14-platinum-open.png' }); await overflow(P2, 'platinum open');
 await P2.click('[data-act=cheer-close]'); assert((await txt(P2)).includes('Passport · Platinum 197 to go') || (await txt(P2)).includes('Passport · Platinum 0 of 197'), 'the passport link counts platinum: ' + (await P2.textContent('#fx-pp-link')));
 await P2.click('[data-act=rules-back]'); await enter(P2, 'Boo'); eq(await P2.locator('#fx-cheer').count(), 0, 'announced once');
 // a hint-free flag with its bonus question right earns platinum; a hinted one does not
@@ -177,7 +177,7 @@ await round(P2, { hintOn: 4 }); let sp = await st(P2);
 eq(sp.newPlat, 9, 'nine platinum stars: every flag but the hinted one'); eq((await fx(P2, 'plats', 'Boo')).length, 9, 'kept');
 assert((await txt(P2, '#fx-stamp-note')).includes('9 new platinum stars'), 'the strip counts them'); assert((await txt(P2, '#fx-pstrip')).includes('Platinum passport'), 'and is the platinum strip');
 await P2.screenshot({ path: 'p15-platinum-strip.png', fullPage: true });
-await P2.click('#fx-pstrip'); eq(await P2.locator('.pp-cover.expert').count(), 1, 'the Expert cover in the passport'); assert(/9\s*of 197 platinum stars/.test(await txt(P2, '.fx-band')), 'the passport counts platinum');
+await P2.click('#fx-pstrip'); eq(await P2.locator('.pp-cover.gold').count(), 1, 'the Gold cover in the passport'); assert(/9\s*of 197 platinum stars/.test(await txt(P2, '.fx-band')), 'the passport counts platinum');
 await P2.click('#pp-book'); await P2.waitForTimeout(800); assert((await txt(P2, '.pp-page')).includes('Platinum stars'), 'the holder page counts platinum');
 for (let k = 0; k < 2; k++) { await P2.click('[data-act=pp-next]'); await P2.waitForTimeout(800); }
 eq(await P2.locator('.pp-xs.pl').count() >= 0, true, 'platinum marks render'); await P2.click('[data-act=back]');
