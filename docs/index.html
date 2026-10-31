@@ -1069,21 +1069,25 @@
   }
   // The family's finished days, for the daily wins. A day old enough that nothing more can arrive is fetched once and kept;
   // the last few are looked at again, but not more than every few minutes unless someone is looking at the standings.
+  // Raising DAYS_V makes every device fetch its settled days once more, to pick up a change made in the Firebase console.
+  const DAYS_V = 2;          // 2: 31 Oct 2026, a stray entry deleted by hand
   async function pullDays(f, keen) {
     const cache = kept('fx-cloud-days', f), days = cache.days || {}, today = todayKey(), settled = dayShift(today, -LATE - 1), want = [];
+    const current = cache.v === DAYS_V;
     let from = dayShift(today, -1500); if (from < DAY_ONE) from = DAY_ONE;
-    for (let k = from; k < today; k = dayShift(k, 1)) if (!(days[k] && days[k].done)) want.push(k);
+    for (let k = from; k < today; k = dayShift(k, 1)) if (!(days[k] && days[k].done && current)) want.push(k);
     const age = Date.now() - (cache.at || 0);
-    if (!want.length || (want.every(k => days[k]) && age >= 0 && age < (keen ? 20000 : 300000))) return;
-    const save = () => store.set(gkey('fx-cloud-days', f.fid), { fid: f.fid, at: Date.now(), days });
+    if (!want.length || (current && want.every(k => days[k]) && age >= 0 && age < (keen ? 20000 : 300000))) return;
+    // the version is only written once every day has been fetched, so an interrupted refresh starts again next time
+    const save = done => store.set(gkey('fx-cloud-days', f.fid), Object.assign({ fid: f.fid, at: Date.now(), days }, done ? { v: DAYS_V } : current ? { v: cache.v } : {}));
     for (let i = 0; i < want.length; i += 6) {
       await Promise.all(want.slice(i, i + 6).map(async k => {
         const res = await fsGet(`families/${f.fid}/days/${k}/entries?pageSize=60`);
         days[k] = { rows: ((res && res.documents) || []).map(fsDoc).filter(okRow).map(r => Object.assign({ name: r.name, avatar: r.avatar, score: r.score, t: r.t }, Number.isInteger(r.ms) ? { ms: r.ms } : {})), done: k < settled };
       }));
-      if (i + 6 < want.length) save();
+      if (i + 6 < want.length) save(false);
     }
-    save();
+    save(true);
   }
   // Everyone in the family and the milestones they have reached, for the day summary. Looked at every few minutes at most.
   async function pullPeople(f, keen) {

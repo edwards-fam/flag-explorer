@@ -141,6 +141,14 @@ assert((await wins(C, '2026-10')).includes('Morgan 1/2'), 'Morgan’s 2,300 on t
 assert((await wins(C, '2026-10')).includes('Casey 0/1'), 'in a family, only what the family holds is counted');
 await setDay(A, '2026-10-21'); await A.reload(); await A.waitForTimeout(250); await settle(A);
 eq(await wins(A, '2026-10'), await wins(C, '2026-10'), 'the first device agrees after the late score arrives');
+// a day settled on a device is fetched again once after an update that asks for it, so a score deleted in the console disappears
+mock.docs.delete(`families/${fid}/days/2026-10-17/entries/robin`);
+await sync(A); assert((await wins(A, '2026-10')).includes('Robin'), 'a settled day is not normally fetched again');
+await A.evaluate(f => { const k = 'fx-cloud-days@' + f, c = JSON.parse(localStorage.getItem(k)); delete c.v; c.at = 0; Object.values(c.days).forEach(d => { d.done = true; }); localStorage.setItem(k, JSON.stringify(c)); }, fid);
+let refetch = dayGets(); await sync(A); assert(dayGets() - refetch >= 9, 'a copy from before the update fetches every day again: ' + (dayGets() - refetch));
+eq(await A.evaluate(() => window.__fx.daysBook().get('2026-10-17').map(r => r.name).join()), 'Alex', 'and the deleted score is gone');
+refetch = dayGets(); await sync(A); eq(dayGets() - refetch, 0, 'once only');
+put('2026-10-17', row('Robin', 1200, 12));
 // leaving: the device falls back on what it recorded itself
 await C.click('[data-act=family]'); await C.click('[data-act=family-leave]'); await C.click('[data-act=family-leave]');
 eq(await wins(C, 'all'), '1 Casey 2/2', 'after leaving, the device counts its own days');
