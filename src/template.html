@@ -1032,7 +1032,7 @@
   // The family's finished days, for the daily wins. A day old enough that nothing more can arrive is fetched once and kept;
   // the last few are looked at again, but not more than every few minutes unless someone is looking at the standings.
   // Raising DAYS_V makes every device fetch its settled days once more, to pick up a change made in the Firebase console.
-  const DAYS_V = 2;          // 2: 31 Oct 2026, a stray entry deleted by hand
+  const DAYS_V = 3;          // 2 and 3: 31 Oct 2026, a stray entry deleted by hand (3 after the deletion was made)
   async function pullDays(f, keen) {
     const cache = kept('fx-cloud-days', f), days = cache.days || {}, today = todayKey(), settled = dayShift(today, -LATE - 1), want = [];
     const current = cache.v === DAYS_V;
