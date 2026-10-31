@@ -221,6 +221,10 @@
   .fx-pstrip .fx-meter { display: block; }
   .fx-pstrip.gold { border-color: var(--gold); background: var(--gold-tint); }
   .fx-pstrip.gold .fx-meter i { background: var(--gold); }
+  .fx-pstrip.t2 { border-color: #AEB5BF; background: rgba(174, 181, 191, .16); }
+  .fx-pstrip.t2 .fx-meter i { background: #9AA3AF; }
+  .fx-pstrip.t3 { border-color: #7CC7EA; background: rgba(124, 199, 234, .15); }
+  .fx-pstrip.t3 .fx-meter i { background: #3BA9DC; }
   @media (hover: hover) { .fx-pstrip:hover { border-color: var(--gold); } }
   .fx-pcount { display: block !important; margin-top: .55rem; font-weight: 700; color: var(--ochre); font-size: .95rem; line-height: 1.3; }
   .fx-pintro { display: block !important; margin-top: .5rem; font-size: .88rem; line-height: 1.35; color: var(--ink-soft); }
@@ -337,9 +341,37 @@
   .pp-cover.gold { --pp-navy: #D9BA6C; color: #1B2947; text-shadow: 0 1px 0 rgba(255, 255, 255, .35);
     background: radial-gradient(120% 90% at 30% 15%, rgba(255, 255, 255, .4), transparent 60%), linear-gradient(90deg, rgba(0, 0, 0, .22) 0, transparent 6%), linear-gradient(140deg, #ECD493, #B88D3C); }
   .pp-cover.gold .pp-emblem { filter: drop-shadow(0 1px 0 rgba(255, 255, 255, .4)); }
+  /* Expert: midnight with gold foil, a scatter of gold stars and a gold frame */
+  .pp-cover.expert { --pp-navy: #0E1528; color: #E8C976; text-shadow: 0 1px 0 rgba(0, 0, 0, .6);
+    background: radial-gradient(circle at 18% 22%, #E8C976 0 1.2px, transparent 1.8px), radial-gradient(circle at 78% 14%, #E8C976 0 1px, transparent 1.6px),
+      radial-gradient(circle at 86% 46%, #E8C976 0 1.4px, transparent 2px), radial-gradient(circle at 12% 64%, #E8C976 0 1px, transparent 1.6px),
+      radial-gradient(circle at 70% 78%, #E8C976 0 1.2px, transparent 1.8px), radial-gradient(circle at 34% 88%, #E8C976 0 1px, transparent 1.6px),
+      radial-gradient(circle at 52% 8%, #E8C976 0 .9px, transparent 1.5px), radial-gradient(circle at 92% 88%, #E8C976 0 1px, transparent 1.6px),
+      radial-gradient(120% 90% at 30% 15%, rgba(232, 201, 118, .14), transparent 60%), linear-gradient(90deg, rgba(0, 0, 0, .45) 0, transparent 6%), linear-gradient(160deg, #1A2440, #0B1120);
+    box-shadow: inset 0 0 0 5px #0E1528, inset 0 0 0 6.5px #C9A44E, inset 0 0 0 9px #0E1528, inset 0 0 0 9.8px rgba(201, 164, 78, .6); }
+  /* Platinum: brushed silver-white */
+  .pp-cover.platinum { --pp-navy: #C9CED6; color: #26303F; text-shadow: 0 1px 0 rgba(255, 255, 255, .7);
+    background: repeating-linear-gradient(90deg, rgba(255, 255, 255, .16) 0 1px, transparent 1px 3px), radial-gradient(120% 90% at 28% 12%, rgba(255, 255, 255, .85), transparent 55%),
+      linear-gradient(90deg, rgba(0, 0, 0, .18) 0, transparent 6%), linear-gradient(140deg, #F4F6F8 0%, #C3C9D2 38%, #EEF1F4 58%, #A9B0BB 100%);
+    box-shadow: inset 0 0 0 6px rgba(255, 255, 255, .35), inset 0 0 0 7px rgba(80, 92, 110, .35); }
+  .pp-cover.platinum .pp-emblem { filter: drop-shadow(0 1px 0 rgba(255, 255, 255, .7)); }
+  /* Diamond: icy and bright, with a glint that sweeps across now and then */
+  .pp-cover.diamond { --pp-navy: #CDEBF8; position: relative; overflow: hidden; color: #12324A; text-shadow: 0 1px 0 rgba(255, 255, 255, .8);
+    background: radial-gradient(circle at 22% 30%, #fff 0 1.5px, transparent 2.5px), radial-gradient(circle at 80% 20%, #fff 0 2px, transparent 3px),
+      radial-gradient(circle at 72% 70%, #fff 0 1.4px, transparent 2.4px), radial-gradient(circle at 16% 80%, #fff 0 1.2px, transparent 2px),
+      conic-gradient(from 210deg at 60% 40%, rgba(255, 255, 255, .55), rgba(150, 214, 245, .3), rgba(255, 255, 255, .6), rgba(120, 196, 236, .35), rgba(255, 255, 255, .55)),
+      linear-gradient(90deg, rgba(0, 0, 0, .14) 0, transparent 6%), linear-gradient(150deg, #F2FAFF 0%, #B7E1F5 40%, #F7FCFF 60%, #93CDEB 100%);
+    box-shadow: inset 0 0 0 6px rgba(255, 255, 255, .45), inset 0 0 0 7px rgba(43, 132, 186, .35); }
+  .pp-cover.diamond::after { content: ''; position: absolute; inset: -20% -60%; background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, .85) 50%, transparent 60%);
+    transform: translateX(-70%); animation: pp-glint 4.5s ease-in-out 1s infinite; pointer-events: none; }
+  @keyframes pp-glint { 0%, 55% { transform: translateX(-70%); } 85%, 100% { transform: translateX(70%); } }
+  .pp-cover.diamond .pp-emblem { filter: drop-shadow(0 1px 0 rgba(255, 255, 255, .8)); }
+  .pp-cover.platinum small, .pp-cover.diamond small { font-weight: 700; }
   .pp-cover small { display: block; margin-top: .45rem; font-family: var(--font-data); font-style: normal; font-weight: 600; font-size: .6rem; letter-spacing: .16em; text-transform: uppercase; }
   .pp-stamp { position: relative; }
   .pp-xs { position: absolute; top: 3%; right: 11%; font-size: 1rem; line-height: 1; color: var(--pp-ink-gold); transform: rotate(calc(-1 * var(--r))); }
+  .pp-xs.pl { color: #8E97A4; text-shadow: 0 0 1px #fff, 0 0 3px rgba(255, 255, 255, .9); }
+  .pp-xs.di { color: #2E9BD6; text-shadow: 0 0 2px #fff, 0 0 5px rgba(120, 200, 245, .9); }
   .pp-done { color: var(--pp-ink-gold); }
   .pp-page {
     display: flex; flex-direction: column; height: 100%; padding: 6% 6.5% 4.5%; color: var(--pp-ink); font-family: var(--font-data); text-align: left;
@@ -400,7 +432,7 @@
   @keyframes fx-seal { 0% { transform: rotate(-3deg) scale(1.7); opacity: 0; } 100% { transform: rotate(-3deg) scale(1); opacity: 1; } }
   @keyframes fx-rise { 0% { opacity: 0; transform: translateY(6px); } 100% { opacity: 1; transform: none; } }
   @media (prefers-reduced-motion: reduce) {
-    .fx-stamp, .fx-perfect, .fx-flag, .pp-leaf.out, .pp-leaf.in, .fx-cheer, .fx-cheer-card, .fx-feat { animation: none; }
+    .fx-stamp, .fx-perfect, .fx-flag, .pp-leaf.out, .pp-leaf.in, .fx-cheer, .fx-cheer-card, .fx-feat, .pp-cover.diamond::after { animation: none; }
     .fx-opt, .fx-go, .fx-hint, button.fx-ava { transition: none; }
   }
 </style>
@@ -716,7 +748,7 @@
   }
   // Starting fresh: everything this device has recorded about play (scores, today's result, personal bests, passports and
   // gold stamps). Settings stay. Offered only while the device is outside a family, because shared scores cannot be taken back.
-  const RECORDS = ['fx-tables', 'fx-bests', 'fx-perfect', 'fx-passport', 'fx-days', 'fx-expert', 'fx-marks', 'fx-cheered'];
+  const RECORDS = ['fx-tables', 'fx-bests', 'fx-perfect', 'fx-passport', 'fx-days', 'fx-expert', 'fx-plat', 'fx-diam', 'fx-marks', 'fx-cheered'];
   const anyRecords = () => dailyData().rows.length > 0 || RECORDS.some(k => Object.values(store.get(k, {}) || {}).some(v => v && (v.length || v.score)));
   function wipeRecords() {
     [...RECORDS, 'fx-people'].forEach(k => store.set(k, {}));
@@ -798,15 +830,40 @@
     all[k] = [...list, a2]; store.set('fx-expert', all);
     return true;
   }
-  // Milestones reached, each kept with the moment it was reached: 'c0' to 'c5' for the continents, 'world', 'expert'.
-  const headline = keys => keys.includes('world') || keys.includes('expert') ? keys.filter(k => k[0] !== 'c') : keys;
-  const featName = key => key === 'world' ? 'the passport' : key === 'expert' ? 'the Expert passport' : CONTS[+key.slice(1)];
+  /* Two more levels after the Expert passport. Platinum: name a flag with no hints and answer its bonus question.
+     Diamond: name a flag with no hints within DIAMOND_SECS seconds. Each opens when the level before it is complete. */
+  const DIAMOND_SECS = 5;
+  const plats = name => store.get('fx-plat', {})[plain(name)] || [];
+  const diams = name => store.get('fx-diam', {})[plain(name)] || [];
+  const allIn = list => { const have = new Set(list); return POOL.every(a => have.has(a)); };
+  // The level a player is working on: 0 stamps, 1 expert stars, 2 platinum, 3 diamond, 4 every level complete.
+  function tier(name) { if (!passportDone(name)) return 0; if (!allIn(experts(name))) return 1; if (!allIn(plats(name))) return 2; if (!allIn(diams(name))) return 3; return 4; }
+  const LEVELS = [
+    { key: 'world', list: stamps, one: 'stamp', many: 'stamps', goal: 'a gold passport', title: 'passport', label: '🛂 Passport', link: '' },
+    { key: 'expert', list: experts, one: 'expert star', many: 'expert stars', goal: 'the Expert passport', title: 'Expert passport', label: '★ Expert passport', link: '★ ' },
+    { key: 'platinum', list: plats, one: 'platinum star', many: 'platinum stars', goal: 'the Platinum passport', title: 'Platinum passport', label: '✦ Platinum passport', link: 'Platinum ' },
+    { key: 'diamond', list: diams, one: 'diamond', many: 'diamonds', goal: 'the Diamond passport', title: 'Diamond passport', label: '💎 Diamond passport', link: '💎 ' }];
+  const levelHave = (name, lv) => LEVELS[lv].list(name).filter(a => C[a]).length;
+  function addLevel(key, a2, need) {
+    if (tier(P.name) < need) return false;
+    const all = store.get(key, {}), k = plain(P.name), list = all[k] || [];
+    if (list.includes(a2)) return false;
+    all[k] = [...list, a2]; store.set(key, all);
+    return true;
+  }
+  const addPlat = a2 => addLevel('fx-plat', a2, 2), addDiam = a2 => addLevel('fx-diam', a2, 3);
+  // Milestones reached, each kept with the moment it was reached: 'c0' to 'c5' for the continents, 'world', 'expert', 'platinum', 'diamond'.
+  const FINISHES = ['world', 'expert', 'platinum', 'diamond'];
+  const headline = keys => keys.some(k => FINISHES.includes(k)) ? keys.filter(k => k[0] !== 'c') : keys;
+  const featName = key => key === 'world' ? 'the passport' : FINISHES.includes(key) ? `the ${key[0].toUpperCase() + key.slice(1)} passport` : CONTS[+key.slice(1)];
   const marks = name => store.get('fx-marks', {})[plain(name)] || {};
   function achieved(name) {
     const have = new Set(stamps(name)), ex = new Set(experts(name)), out = [];
     CONT_CODES.forEach((codes, ci) => { if (codes.every(a => have.has(a))) out.push('c' + ci); });
     if (POOL.every(a => have.has(a))) out.push('world');
     if (POOL.every(a => ex.has(a))) out.push('expert');
+    if (allIn(plats(name))) out.push('platinum');
+    if (allIn(diams(name))) out.push('diamond');
     return out;
   }
   function newMarks(name, t = Date.now()) {
@@ -818,7 +875,8 @@
      sync that brought two devices' stamps together, or in a game closed before its results) is owed, and is celebrated the
      next time that player chooses a game here. */
   const cheered = name => (store.get('fx-cheered', {}) || {})[plain(name)] || [];
-  function cheer(name, keys) { if (!keys.length) return; const all = store.get('fx-cheered', {}) || {}, k = plain(name); all[k] = [...new Set([...(all[k] || []), ...keys])]; store.set('fx-cheered', all); }
+  const NEXT_OPEN = { expert: 'lv-platinum', platinum: 'lv-diamond' };
+  function cheer(name, keys) { if (!keys.length) return; keys = [...keys, ...keys.map(k => NEXT_OPEN[k]).filter(Boolean)]; const all = store.get('fx-cheered', {}) || {}, k = plain(name); all[k] = [...new Set([...(all[k] || []), ...keys])]; store.set('fx-cheered', all); }
   const owed = name => { const seen = cheered(name); return Object.keys(marks(name)).filter(k => !seen.includes(k)); };
   // The first time this version runs on a device, continents already reached count as celebrated; a full or Expert passport
   // does not, because a player who finished one before could easily have missed it.
@@ -831,12 +889,13 @@
   const COUNTDOWN = 75;
   const introduced = name => (store.get('fx-pp-intro', []) || []).includes(plain(name));
   function introduce(name) { const list = store.get('fx-pp-intro', []) || []; if (!list.includes(plain(name))) store.set('fx-pp-intro', [...list, plain(name)]); }
-  // Milestones travel with the family's copy of a player as 'm|key|time'; expert stars as 'x|code'.
+  // Milestones travel with the family's copy of a player as 'm|key|time'; expert stars as 'x|code', platinum 'p|code', diamonds 'd|code'.
   const readMarks = codes => { const out = {}; for (const c of codes) { const [tag, k, t] = c.split('|'); if (tag === 'm' && k && +t > 0 && (!out[k] || +t < out[k])) out[k] = +t; } return out; };
   // The last stretch: the flags a player still needs for the next finish line. Within 20 of it, free play deals them more often.
   const LAST_STRETCH = 20, LEAN = 3;
   function stillMissing(name) {
-    const have = new Set(passportDone(name) ? experts(name) : stamps(name));
+    const lv = tier(name); if (lv > 3) return [];
+    const have = new Set(LEVELS[lv].list(name));
     return POOL.filter(a => !have.has(a));
   }
 
@@ -976,7 +1035,7 @@
     const playedHere = stamps(who.name).length > 0 || ['world', 'known', 'daily'].some(t => bestFor(t, who.name).score > 0);
     // A name the family has no record of and that has nothing to save here (typed but never played) gets no record:
     // a name entered by mistake stays off the family's list, and a record deleted in the Firebase console stays deleted.
-    if (!doc && !playedHere && !perfects(who.name).length && !experts(who.name).length) return;
+    if (!doc && !playedHere && !perfects(who.name).length && !experts(who.name).length && !plats(who.name).length) return;
     // down: stamps, gold stamps and bests the family has and this device does not
     const all = store.get('fx-passport', {}), have = all[key] || [], extra = texts(d.stamps).filter(a => C[a] && !have.includes(a));
     if (extra.length) { all[key] = [...have, ...extra]; store.set('fx-passport', all); }
@@ -985,6 +1044,10 @@
     if (more.length) { golds[key] = [...mine, ...more].sort((a, b) => a.t - b.t); store.set('fx-perfect', golds); }
     const codes = texts(d.perfect), exAll = store.get('fx-expert', {}), exMine = exAll[key] || [], exMore = codes.filter(c => c.startsWith('x|')).map(c => c.slice(2)).filter(a => C[a] && !exMine.includes(a));
     if (exMore.length) { exAll[key] = [...exMine, ...exMore]; store.set('fx-expert', exAll); }
+    for (const [tag, skey] of [['p', 'fx-plat'], ['d', 'fx-diam']]) {        // platinum marks as 'p|code', diamonds as 'd|code'
+      const lvAll = store.get(skey, {}), lvMine = lvAll[key] || [], lvMore = codes.filter(c => c.startsWith(tag + '|')).map(c => c.slice(2)).filter(a => C[a] && !lvMine.includes(a));
+      if (lvMore.length) { lvAll[key] = [...lvMine, ...lvMore]; store.set(skey, lvAll); }
+    }
     const theirs = readMarks(codes), mkAll = store.get('fx-marks', {}), mk = Object.assign({}, mkAll[key] || {}); let mkMore = false;
     for (const [k, t] of Object.entries(theirs)) if (!mk[k] || t < mk[k]) { mk[k] = t; mkMore = true; }
     if (mkMore) { mkAll[key] = mk; store.set('fx-marks', mkAll); }
@@ -1001,7 +1064,7 @@
     if (doc && d.avatar && d.avatar !== who.avatar && (last === undefined ? !playedHere : last === who.avatar)) setFace(who, d.avatar);
     // up: only if this device holds something the family's copy does not
     const want = { name: typeof d.name === 'string' && d.name ? d.name : who.name, avatar: who.avatar || '' };
-    const allStamps = [...new Set([...texts(d.stamps), ...stamps(who.name).filter(a => C[a])])].slice(0, 250), allGold = [...new Set([...texts(d.perfect), ...perfects(who.name).map(goldCode), ...experts(who.name).map(a => 'x|' + a), ...Object.entries(marks(who.name)).map(([k, t]) => `m|${k}|${t}`)])].slice(-3000);
+    const allStamps = [...new Set([...texts(d.stamps), ...stamps(who.name).filter(a => C[a])])].slice(0, 250), allGold = [...new Set([...texts(d.perfect), ...perfects(who.name).map(goldCode), ...experts(who.name).map(a => 'x|' + a), ...plats(who.name).map(a => 'p|' + a), ...diams(who.name).map(a => 'd|' + a), ...Object.entries(marks(who.name)).map(([k, t]) => `m|${k}|${t}`)])].slice(-3000);
     if (allStamps.length) want.stamps = allStamps;
     if (allGold.length) want.perfect = allGold;
     const nums = [];
@@ -1185,8 +1248,8 @@
   function roundState(round, name, more) {
     // limit: seconds allowed for each answer (0 for no clock). ms: the time taken over the round's timed answers.
     return Object.assign({ screen: 'play', mode: 'free', table: O.pool, clock: !!O.clock, limit: O.clock ? CLOCK : 0, ms: 0, practice: false, round, i: 0, score: 0, streak: 0, topStreak: 0, log: [], q: null,
-      confirmEnd: false, newBest: false, newStamps: 0, newExpert: 0, feats: [], place: 0, entryT: 0, perfect: false, tip: !store.get('fx-tipped', []).includes(plain(name)),
-      left0: stillMissing(name).length, done0: passportDone(name), intro: false }, more);       // how far from the next finish line the round began
+      confirmEnd: false, newBest: false, newStamps: 0, newExpert: 0, newPlat: 0, newDiam: 0, feats: [], place: 0, entryT: 0, perfect: false, tip: !store.get('fx-tipped', []).includes(plain(name)),
+      left0: stillMissing(name).length, lv0: tier(name), intro: false }, more);       // how far from the next finish line the round began
   }
 
   /* ---------- Pass and play: two to eight players on one device, one flag a turn ---------- */
@@ -1288,6 +1351,7 @@
     S.score += e.pts + e.streakPts + e.speedPts + e.wagerPts;
     if (ok && !S.practice && addStamp(q.a2)) S.newStamps++;
     if (ok && !q.hints.length && !S.practice && addExpert(q.a2)) S.newExpert++;
+    if (ok && !q.hints.length && !S.practice && secs <= DIAMOND_SECS && addDiam(q.a2)) S.newDiam++;
     q.phase = 'result';
     if (!ok) { if (e.timedOut) SFX.timeout(); else SFX.wrong(); if (q.wager) SFX.wagerLose(); }
     else { SFX.right(); if (q.wager) SFX.wagerWin(); else if (e.streakPts && STREAK.some(t => t[0] === S.streak)) SFX.streak(S.streak); }
@@ -1298,7 +1362,7 @@
     if (q.phase !== 'bonus') return;
     if (bonusTimed()) addTime((Date.now() - q.t0) / 1000);
     q.bonus.pick = i;
-    if (i === q.bonus.answer) { e.bonus = 'won'; e.bonusPts = BONUS; S.score += BONUS; SFX.bonus(); } else { e.bonus = 'lost'; SFX.wrong(); }
+    if (i === q.bonus.answer) { e.bonus = 'won'; e.bonusPts = BONUS; S.score += BONUS; SFX.bonus(); if (!S.practice && !e.hints.length && addPlat(e.a2)) S.newPlat++; } else { e.bonus = 'lost'; SFX.wrong(); }
     q.phase = 'bonusResult';
   }
 
@@ -1339,7 +1403,7 @@
   function finish() {
     closeRound(); cloudSync();
     S.screen = 'end'; S.q = null;
-    const big = headline(S.feats).filter(k => k === 'world' || k === 'expert');
+    const big = headline(S.feats).filter(k => FINISHES.includes(k));
     if (big.length) S.cheer = { keys: big };             // a full or Expert passport gets the whole screen
     const t = totals(S.log);
     // Celebration waits for the results screen, after the last answer of the round (bonus question included).
@@ -1571,7 +1635,8 @@
     }
     return out.sort((a, b) => a.t - b.t);
   }
-  const featLine = x => x.key === 'world' ? `🌍 ${x.name} stamped every country in the passport!` : x.key === 'expert' ? `⭐ ${x.name} completed the Expert passport!` : `🗺️ ${x.name} completed ${CONTS[+x.key.slice(1)]}!`;
+  const featLine = x => x.key === 'world' ? `🌍 ${x.name} stamped every country in the passport!` : x.key === 'expert' ? `⭐ ${x.name} completed the Expert passport!`
+    : x.key === 'platinum' ? `✦ ${x.name} completed the Platinum passport!` : x.key === 'diamond' ? `💎 ${x.name} completed the Diamond passport!` : `🗺️ ${x.name} completed ${CONTS[+x.key.slice(1)]}!`;
   function dayText(date, book = daysBook()) {
     const rows = [...(book.get(date) || [])].sort(byScore), won = dayWinners(rows);
     if (!rows.length) return `🌍 Flag Explorer · ${many() ? family().name : `Today's challenge`}\n${dayLabel(date)}\n\nNo scores for this day.`;
@@ -1707,8 +1772,7 @@
   function ppPage(n) {
     const pages = ppPages(), pg = pages[n];
     if (pg.type === 'cover') {
-      const done = passportDone(P.name), master = done && experts(P.name).length >= POOL.length;
-      return `<div class="pp-cover${done ? ' gold' : ''}"><span class="pp-cover-t">Passport</span>${EMBLEM}<span class="pp-cover-b">Flag Explorer${done ? `<small>${master ? 'Expert · every flag mastered' : 'Every country stamped'}</small>` : ''}</span></div>`;
+      return coverHTML(tier(P.name));
     }
     if (pg.type === 'id') {
       const key = plain(P.name), no = 'FX' + String(hashStr(key) % 10000000).padStart(7, '0');
@@ -1726,6 +1790,8 @@
             ${f('Flags stamped', `${pg.total} of ${POOL.length}`)}
             ${f('Continents reached', `${conts} of ${CONTS.length}${full ? ` · ${full} complete` : ''}`)}
             ${done ? f('Expert stars', `${experts(P.name).length} of ${POOL.length}`) : ''}
+            ${tier(P.name) >= 2 ? f('Platinum stars', `${plats(P.name).length} of ${POOL.length}`) : ''}
+            ${tier(P.name) >= 3 ? f('Diamonds', `${diams(P.name).length} of ${POOL.length}`) : ''}
           </div>
         </div>
         <p class="pp-f" style="margin-top:5%">Signature of bearer</p>
@@ -1744,13 +1810,16 @@
         <div class="pp-foot"><span>Honours</span><span>${n - 1}</span></div>
       </div>`;
     }
-    const ex = new Set(experts(P.name)), done = passportDone(P.name);
+    const ex = new Set(experts(P.name)), pl = new Set(plats(P.name)), di = new Set(diams(P.name)), lv = Math.min(tier(P.name), 3);
+    // each stamp shows the highest mark it has earned: a gold star, a platinum star, or a diamond
+    const mark = a => di.has(a) ? '<b class="pp-xs di" title="Named in 5 seconds or less">◆</b>' : pl.has(a) ? '<b class="pp-xs pl" title="Named with no hints and its bonus question answered">★</b>'
+      : ex.has(a) ? '<b class="pp-xs" title="Named with no hints">★</b>' : '';
     const stamp = a => {
       const h = hashStr(a + 'stamp'), name = C[a].name, shape = name.length > 13 ? 1 : h % 3;
-      return `<div class="pp-stamp s${shape}" style="--k:var(--pp-ink-${INKS[(h >>> 3) % 4]});--r:${((h >>> 6) % 15) - 7}deg">${ex.has(a) ? '<b class="pp-xs" title="Named with no hints">★</b>' : ''}<img data-flag="${a}" alt=""><span>${esc(name)}</span></div>`;
+      return `<div class="pp-stamp s${shape}" style="--k:var(--pp-ink-${INKS[(h >>> 3) % 4]});--r:${((h >>> 6) % 15) - 7}deg">${mark(a)}<img data-flag="${a}" alt=""><span>${esc(name)}</span></div>`;
     };
-    const stars = pg.codes.length ? CONT_CODES[CONTS.indexOf(pg.name)].filter(a => ex.has(a)).length : 0;
-    const right = done ? `<span class="pp-done">★ ${stars} of ${pg.total}</span>` : pg.count === pg.total ? `<span class="pp-done">Complete</span> · ${pg.count}` : `${pg.count} of ${pg.total}`;
+    const track = new Set(LEVELS[lv].list(P.name)), got = pg.codes.length ? CONT_CODES[CONTS.indexOf(pg.name)].filter(a => track.has(a)).length : 0;
+    const right = lv ? `<span class="pp-done">${['', '★', '✦', '◆'][lv]} ${got} of ${pg.total}</span>` : pg.count === pg.total ? `<span class="pp-done">Complete</span> · ${pg.count}` : `${pg.count} of ${pg.total}`;
     return `<div class="pp-page">
       <div class="pp-top"><span>${pg.name}${pg.parts > 1 ? ` · ${pg.part} of ${pg.parts}` : ''}</span><span>${right}</span></div>
       ${pg.codes.length ? `<div class="pp-grid">${pg.codes.map(stamp).join('')}</div>` : `<div class="pp-none">No stamps from ${pg.name} yet. Name one of its ${pg.total} flags to earn the first.</div>`}
@@ -1761,19 +1830,29 @@
     : `<button class="fx-quiet whitespace-nowrap" data-act="pp-prev">${n === 1 ? 'Close' : 'Previous'}</button>
       <span class="fx-label whitespace-nowrap">Page ${n} of ${len - 1}</span>
       <button class="fx-quiet whitespace-nowrap" data-act="pp-next" ${n >= len - 1 ? 'disabled style="visibility:hidden"' : ''}>Next</button>`;
+  const LEVEL_RULE = [`A flag is stamped the first time you name it correctly, in any recorded game. Complete a continent, then the whole world.`,
+    `Passport complete. A gold star goes on a stamp the first time you name that flag with no hints. Star all ${POOL.length} for the Expert passport.`,
+    `Expert passport complete. A platinum star goes on a stamp when you name that flag with no hints and answer its bonus question. Earn all ${POOL.length} for the Platinum passport.`,
+    `Platinum passport complete. A diamond goes on a stamp when you name that flag with no hints in ${DIAMOND_SECS} seconds or less. Earn all ${POOL.length} for the Diamond passport.`,
+    `Every level complete: gold, Expert, Platinum and Diamond. The whole world, known in a flash.`];
+  // The cover for each level: navy, then gold, starry Expert, brushed platinum and sparkling diamond.
+  function coverHTML(t) {
+    const cls = ['', ' gold', ' expert', ' platinum', ' diamond'][Math.min(t, 4)], sub = ['', 'Every country stamped', 'Expert · every flag mastered', 'Platinum · every country known', 'Diamond · lightning recall'][Math.min(t, 4)];
+    return `<div class="pp-cover${cls}"><span class="pp-cover-t">Passport</span>${EMBLEM}<span class="pp-cover-b">Flag Explorer${sub ? `<small>${sub}</small>` : ''}</span></div>`;
+  }
   function viewPassport() {
-    const pages = ppPages(), done = passportDone(P.name), total = done ? experts(P.name).length : pages[1].total;
+    const t = tier(P.name), lv = Math.min(t, 3), pages = ppPages(), done = lv > 0, total = lv ? levelHave(P.name, lv) : pages[1].total;
+    const unit = ['stamped', 'expert stars', 'platinum stars', 'diamonds'][lv], tone = ['', 'var(--gold)', '#9AA3AF', '#3BA9DC'][lv];
     S.pp = Math.min(S.pp || 0, pages.length - 1);
     return `<main class="fx-sheet mx-auto max-w-xl">
       <div class="fx-band flex items-end justify-between gap-3">
         <div class="min-w-0"><p class="fx-label">Passport of</p><h1 class="fx-h text-3xl fx-clip whitespace-nowrap">${esc(P.name)}</h1></div>
-        <p class="fx-label flex-none text-right"><span class="fx-num">${total}</span><br>of ${POOL.length} ${done ? 'expert stars' : 'stamped'}</p>
+        <p class="fx-label flex-none text-right"><span class="fx-num">${total}</span><br>of ${POOL.length} ${unit}</p>
       </div>
-      <div class="fx-meter" role="img" aria-label="${total} of ${POOL.length} ${done ? 'expert stars' : 'flags stamped'}"><i style="width:${(100 * total / POOL.length).toFixed(1)}%${done ? ';background:var(--gold)' : ''}"></i></div>
+      <div class="fx-meter" role="img" aria-label="${total} of ${POOL.length} ${done ? unit : 'flags stamped'}"><i style="width:${(100 * total / POOL.length).toFixed(1)}%${tone ? ';background:' + tone : ''}"></i></div>
       <div class="pp-stage mt-2"><div class="pp-book" id="pp-book" role="button" tabindex="0" data-act="pp-flip" aria-label="Passport. Tap the right side to turn the page, the left side to go back."><div class="pp-leaf">${ppPage(S.pp)}</div></div></div>
       <div class="flex items-center justify-between gap-3" id="pp-nav">${ppNav(S.pp, pages.length)}</div>
-      <p class="text-ink-soft text-sm text-center mt-2" id="pp-rule">${done ? `Passport complete. A gold star goes on a stamp the first time you name that flag with no hints. Star all ${POOL.length} for the Expert passport.`
-        : `A flag is stamped the first time you name it correctly, in any recorded game. Complete a continent, then the whole world.`}</p>
+      <p class="text-ink-soft text-sm text-center mt-2" id="pp-rule">${LEVEL_RULE[Math.min(t, 4)]}</p>
       <button class="fx-go mt-5" data-act="back">Back</button>
     </main>`;
   }
@@ -1998,20 +2077,21 @@
   // What a round added to the passport, and how close the next finish line is
   // The passport strip on the results screen: what the round added, how far along the passport is, and the countdown.
   function stampNote(s, name) {
-    // the strip follows the finish line the round began on: stamps, or expert stars once the passport was complete
-    const done = !!s.done0, have = done ? experts(name).length : stamps(name).filter(a => C[a]).length, left = POOL.length - have;
-    if (s.practice || (done && !left && !s.newExpert)) return '';
-    const news = done ? (s.newExpert ? plural(s.newExpert, 'new expert star') : 'No new expert stars this round')
-      : (s.newStamps ? plural(s.newStamps, 'new stamp') : 'No new stamps this round') + (left ? '' : ' · passport complete!');
+    // the strip follows the level the round began on
+    const t0 = s.lv0 !== undefined ? s.lv0 : s.done0 ? 1 : 0;
+    if (s.practice || t0 > 3) return '';
+    const L = LEVELS[t0], have = levelHave(name, t0), left = POOL.length - have, n = [s.newStamps, s.newExpert, s.newPlat, s.newDiam][t0] || 0;
+    const news = (n ? plural(n, 'new ' + L.one) : `No new ${L.many} this round`) + (left ? '' : ` · ${L.title} complete!`);
     // the countdown: a step of five crossed from 75 to go, then every round in the last stretch
     const step = Math.ceil(left / 5) * 5, crossed = left > 0 && left < s.left0 && step < s.left0 && step <= COUNTDOWN;
-    const goal = done ? 'the Expert passport' : 'a gold passport';
-    const count = left && left <= LAST_STRETCH ? `Only ${left} to go for ${goal}. Free play now deals ${left === 1 ? 'it' : 'them'} more often.`
-      : crossed ? `${left} ${done ? (left === 1 ? 'star' : 'stars') : (left === 1 ? 'stamp' : 'stamps')} to go for ${goal}!` : '';
-    const intro = s.intro && !done ? `Every flag you name earns a stamp in your passport. Stamp all ${POOL.length} countries for a gold passport.`
-      : s.intro ? `Name a flag with no hints and its stamp earns a gold star. Star all ${POOL.length} for the Expert passport.` : '';
-    return `<button type="button" class="fx-pstrip ${done || !left ? 'gold' : ''}" data-act="passport" id="fx-pstrip" aria-label="Open your passport. ${esc(news)}. ${have} of ${POOL.length}.">
-        <span class="flex items-baseline justify-between gap-3"><span class="fx-label">${done ? '★ Expert passport' : '🛂 Passport'}</span><span class="fx-label">Open ›</span></span>
+    const count = left && left <= LAST_STRETCH ? `Only ${left} to go for ${L.goal}. Free play now deals ${left === 1 ? 'it' : 'them'} more often.`
+      : crossed ? `${left} ${left === 1 ? L.one.replace(/^(expert|platinum) /, '') : L.many.replace(/^(expert|platinum) /, '')} to go for ${L.goal}!` : '';
+    const intro = !s.intro ? '' : [`Every flag you name earns a stamp in your passport. Stamp all ${POOL.length} countries for a gold passport.`,
+      `Name a flag with no hints and its stamp earns a gold star. Star all ${POOL.length} for the Expert passport.`,
+      `Name a flag with no hints and answer its bonus question for a platinum star. Earn all ${POOL.length} for the Platinum passport.`,
+      `Name a flag with no hints in ${DIAMOND_SECS} seconds or less for a diamond. Earn all ${POOL.length} for the Diamond passport.`][t0];
+    return `<button type="button" class="fx-pstrip t${t0} ${t0 || !left ? 'gold' : ''}" data-act="passport" id="fx-pstrip" aria-label="Open your passport. ${esc(news)}. ${have} of ${POOL.length}.">
+        <span class="flex items-baseline justify-between gap-3"><span class="fx-label">${L.label}</span><span class="fx-label">Open ›</span></span>
         <span class="flex items-baseline justify-between gap-3 mt-1"><b class="font-semibold" id="fx-stamp-note">${news}</b><span class="fx-num whitespace-nowrap">${have}<span class="text-ink-soft font-normal"> of ${POOL.length}</span></span></span>
         <span class="fx-meter mt-2" aria-hidden="true"><i style="width:${(100 * have / POOL.length).toFixed(1)}%"></i></span>
         ${count ? `<span class="fx-pcount" id="fx-countdown">${count}</span>` : ''}
@@ -2023,36 +2103,59 @@
       <p>All ${POOL.length} flags are stamped. Your passport cover is now gold.</p>
       <p><b class="font-semibold">Next, the Expert passport:</b> every flag you name with no hints now earns a gold star on its stamp. Star all ${POOL.length} to finish it.</p></div>`;
     if (key === 'expert') return `<div class="fx-feat big" id="fx-feat-expert"><p class="fx-label">Every flag, not one hint</p><h2>★ Expert passport complete</h2>
-      <p>You have named all ${POOL.length} flags without a single hint. The whole world, mastered.</p></div>`;
+      <p>You have named all ${POOL.length} flags without a single hint. The whole world, mastered.</p>
+      <p><b class="font-semibold">Next, the Platinum passport:</b> name a flag with no hints and answer its bonus question for a platinum star.</p></div>`;
+    if (key === 'platinum') return `<div class="fx-feat big" id="fx-feat-platinum"><p class="fx-label">Every flag and its bonus question</p><h2>✦ Platinum passport complete</h2>
+      <p>You know every country, not just its flag.</p>
+      <p><b class="font-semibold">Next, the Diamond passport:</b> name a flag with no hints in ${DIAMOND_SECS} seconds or less for a diamond.</p></div>`;
+    if (key === 'diamond') return `<div class="fx-feat big" id="fx-feat-diamond"><p class="fx-label">Every flag in ${DIAMOND_SECS} seconds</p><h2>💎 Diamond passport complete</h2>
+      <p>Every level of the passport is complete. The whole world, known in a flash.</p></div>`;
     const ci = +key.slice(1);
     return `<div class="fx-feat" data-feat="${key}"><h2>🗺️ ${CONTS[ci]} complete</h2><p>All ${CONT_CODES[ci].length} of its flags are stamped in your passport.</p></div>`;
   }
-  // The whole-screen celebration: a full or Expert passport, or milestones this device has not celebrated yet.
+  // The whole-screen celebration: a completed level, a level newly open, or milestones this device has not celebrated yet.
   function viewCheer() {
-    const keys = S.cheer.keys, name = esc(P.name), cover = (sub, gold = true) => `<div class="fx-cheer-book" aria-hidden="true"><div class="pp-cover${gold ? ' gold' : ''}"><span class="pp-cover-t">Passport</span>${EMBLEM}<span class="pp-cover-b">Flag Explorer${sub ? `<small>${sub}</small>` : ''}</span></div></div>`;
-    const stars = experts(P.name).length, buttons = label => `<button class="fx-go mt-5" data-act="cheer-passport" data-primary>${label}</button><button class="fx-quiet block mx-auto mt-3" data-act="cheer-close">Keep playing</button>`;
+    const keys = S.cheer.keys, name = esc(P.name), cover = t => `<div class="fx-cheer-book" aria-hidden="true">${coverHTML(t)}</div>`;
+    const buttons = label => `<button class="fx-go mt-5" data-act="cheer-passport" data-primary>${label}</button><button class="fx-quiet block mx-auto mt-3" data-act="cheer-close">Keep playing</button>`;
+    const next = (title, text, have) => `<div class="fx-cheer-next"><b class="font-semibold">${title}</b><p>${text}${have ? ` You have ${have} already.` : ''}</p></div>`;
+    const PLAT = `Name a flag with <b>no hints</b> and then answer its <b>bonus question</b> right, and its stamp earns a platinum star. Earn all ${POOL.length} to complete it.`;
+    const DIAM = `Name a flag with <b>no hints</b> in <b>${DIAMOND_SECS} seconds or less</b>, in any game, and its stamp earns a diamond. Earn all ${POOL.length} to complete it.`;
+    const n = (list, one) => list.length ? plural(list.length, one) : '';
     let body;
-    if (keys.includes('expert')) body = `${cover('Expert · every flag mastered')}<p class="fx-label">Every flag, not one hint</p><h2 id="fx-cheer-h">Expert passport complete</h2>
-      <p>${name}, you have named all ${POOL.length} flags without a single hint. Every stamp in your passport carries a gold star. The whole world, mastered.</p>${buttons('See my Expert passport')}`;
-    else if (keys.includes('world')) body = `${cover('Every country stamped')}<p class="fx-label">Every country in the world</p><h2 id="fx-cheer-h">Gold passport!</h2>
+    if (keys.includes('diamond')) body = `${cover(4)}<p class="fx-label">Every flag in ${DIAMOND_SECS} seconds</p><h2 id="fx-cheer-h">Diamond passport!</h2>
+      <p>${name}, you have named all ${POOL.length} flags, with no hints, in ${DIAMOND_SECS} seconds or less. Every level of the passport is complete: gold, Expert, Platinum and Diamond. The whole world, known in a flash.</p>${buttons('See my Diamond passport')}`;
+    else if (keys.includes('platinum')) body = `${cover(3)}<p class="fx-label">Every flag and its bonus question</p><h2 id="fx-cheer-h">Platinum passport!</h2>
+      <p>${name}, you know every country, not just its flag. Your passport is now platinum.</p>${next(`What's next: the Diamond passport`, DIAM, n(diams(P.name), 'diamond'))}${buttons('See my Platinum passport')}`;
+    else if (keys.includes('expert')) body = `${cover(2)}<p class="fx-label">Every flag, not one hint</p><h2 id="fx-cheer-h">Expert passport complete</h2>
+      <p>${name}, you have named all ${POOL.length} flags without a single hint. Every stamp carries a gold star, and your passport has a new Expert cover.</p>${next(`What's next: the Platinum passport`, PLAT, n(plats(P.name), 'platinum star'))}${buttons('See my Expert passport')}`;
+    else if (keys.includes('lv-platinum')) body = `${cover(2)}<p class="fx-label">New in your passport</p><h2 id="fx-cheer-h">The Platinum passport</h2>
+      <p>${name}, your Expert passport has a new cover, and a new level is open.</p>${next('How to earn it', PLAT, n(plats(P.name), 'platinum star'))}
+      <p class="text-sm text-ink-soft">After Platinum comes one more level: the Diamond passport.</p>${buttons('See my Expert passport')}`;
+    else if (keys.includes('lv-diamond')) body = `${cover(3)}<p class="fx-label">New in your passport</p><h2 id="fx-cheer-h">The Diamond passport</h2>
+      <p>${name}, a new level is open.</p>${next('How to earn it', DIAM, n(diams(P.name), 'diamond'))}${buttons('See my Platinum passport')}`;
+    else if (keys.includes('world')) body = `${cover(1)}<p class="fx-label">Every country in the world</p><h2 id="fx-cheer-h">Gold passport!</h2>
       <p>${name}, you have stamped all ${POOL.length} countries. Your passport is complete and its cover is now gold.</p>
-      <div class="fx-cheer-next"><b class="font-semibold">What's next: the Expert passport</b>
-        <p>Every flag you name with <b>no hints</b> now earns a gold star on its stamp. Star all ${POOL.length} to complete it.${stars ? ` You have ${plural(stars, 'star')} already.` : ''}</p></div>${buttons('See my gold passport')}`;
+      ${next(`What's next: the Expert passport`, `Every flag you name with <b>no hints</b> now earns a gold star on its stamp. Star all ${POOL.length} to complete it.`, n(experts(P.name), 'star'))}${buttons('See my gold passport')}`;
     else { const names = keys.map(k => CONTS[+k.slice(1)]), flags = keys.reduce((n, k) => n + CONT_CODES[+k.slice(1)].length, 0), have = stamps(P.name).filter(a => C[a]).length;
-      body = `${cover('', false)}<p class="fx-label">Passport milestone</p><h2 id="fx-cheer-h">🗺️ ${listOf(names)} complete</h2>
+      body = `${cover(0)}<p class="fx-label">Passport milestone</p><h2 id="fx-cheer-h">🗺️ ${listOf(names)} complete</h2>
       <p>${name}, every one of ${keys.length > 1 ? `their ${flags}` : `its ${flags}`} flags is stamped in your passport. ${have} of ${POOL.length} countries so far; stamp them all for a gold passport.</p>${buttons('See my passport')}`; }
     return `<div class="fx-cheer" role="dialog" aria-modal="true" aria-labelledby="fx-cheer-h" id="fx-cheer"><div class="fx-cheer-card">${body}</div></div>`;
   }
   // The passport link under Choose your game: progress, or the countdown once the finish line is within 75.
   function ppLinkText(name) {
-    const done = passportDone(name), have = done ? experts(name).length : stamps(name).filter(a => C[a]).length, left = POOL.length - have;
-    if (done && !left) return '★ Expert';
-    return left <= COUNTDOWN ? `${done ? '★ ' : ''}${left} to go` : `${done ? '★ ' : ''}${have} of ${POOL.length}`;
+    const t = tier(name); if (t > 3) return '💎 Diamond';
+    const have = levelHave(name, t), left = POOL.length - have, pre = LEVELS[t].link;
+    return left <= COUNTDOWN ? `${pre}${left} to go` : `${pre}${have} of ${POOL.length}`;
   }
   // A milestone owed to the player now choosing a game is celebrated as the screen opens.
   function owedCheer() {
     if (S.screen !== 'rules' || S.cheer || !P) return;
-    const due = owed(P.name); if (!due.length) return;
+    let due = owed(P.name);
+    if (!due.length) {          // a level newly open to a player who finished the one before it earlier
+      const t = tier(P.name), open = t === 2 ? 'lv-platinum' : t === 3 ? 'lv-diamond' : null;
+      if (!open || cheered(P.name).includes(open)) return;
+      due = [open];
+    }
     S.cheer = { keys: headline(due) }; cheer(P.name, due);
     SFX.perfect(); confetti(true);
   }
@@ -2426,6 +2529,6 @@
   if (hot && hot.snapshot) hot.snapshot(() => ({ S, P, M }));
   if (hot && hot.ready) hot.ready(data => boot(data || liveSaved())); else boot((hot && hot.data) || liveSaved());
 
-  window.__fx = { showGroup, playedToday, groups, stampNote, ppLinkText, owed, timeText, dayWinners, DAY_CLOCK, DAY_CLOCK_FROM, byScore, experts, achieved, newMarks, stillMissing, passportDone, featsOn, CONT_CODES, POOL, dayText, winsTable, daysBook, dayShift, family, cloudSync, cloudState, pidOf, perfects, deck, markSeen, seenList, get match() { return M; }, standings, fitOpts, get sound() { return { ac, master, keepAlive, IOS }; }, ppPages, flagWorth, streakBonus, speedBonus, totals, entryTotal, get state() { return S; }, get player() { return P; }, get opts() { return O; }, C, POOLS, KNOWN, buildRound, tableRows, stamps, shareText, todayKey, AVATARS };
+  window.__fx = { tier, plats, diams, coverHTML, showGroup, playedToday, groups, stampNote, ppLinkText, owed, timeText, dayWinners, DAY_CLOCK, DAY_CLOCK_FROM, byScore, experts, achieved, newMarks, stillMissing, passportDone, featsOn, CONT_CODES, POOL, dayText, winsTable, daysBook, dayShift, family, cloudSync, cloudState, pidOf, perfects, deck, markSeen, seenList, get match() { return M; }, standings, fitOpts, get sound() { return { ac, master, keepAlive, IOS }; }, ppPages, flagWorth, streakBonus, speedBonus, totals, entryTotal, get state() { return S; }, get player() { return P; }, get opts() { return O; }, C, POOLS, KNOWN, buildRound, tableRows, stamps, shareText, todayKey, AVATARS };
 })();
 </script>

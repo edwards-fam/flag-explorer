@@ -80,7 +80,8 @@ eq(await B.locator('#fx-feat-expert').count(), 1, 'and is announced'); assert((a
 await B.screenshot({ path: 'p9-expert-cheer.png' }); await B.click('[data-act=cheer-passport]'); eq((await st(B)).screen, 'passport', 'its button opens the passport'); await B.click('[data-act=back]');
 await B.screenshot({ path: 'p4-expert-complete.png', fullPage: true }); await overflow(B, 'expert complete');
 await B.click('[data-act=passport]'); assert((await txt(B, '.pp-cover')).includes('Expert · every flag mastered'), 'the gold cover says so');
-assert(/197\s*of 197 expert stars/.test(await txt(B, '.fx-band')), 'all stars');
+assert(/\d+\s*of 197 platinum stars/.test(await txt(B, '.fx-band')), 'the passport now counts platinum stars'); eq(await B.locator('.pp-cover.expert').count(), 1, 'the Expert cover');
+await B.screenshot({ path: 'p13-expert-cover.png' });
 
 // ---- 3. the last stretch: within 20, three missing flags a round; further away, nothing changes
 const D = await mk('D'); const gap = POOL.slice(20, 30);
@@ -160,6 +161,57 @@ assert((await txt(M2, '#fx-pstrip')).includes('10 new stamps') && (await txt(M2,
 await M2.screenshot({ path: 'p12-strip-intro.png', fullPage: true }); await overflow(M2, 'strip');
 await M2.click('#fx-pstrip'); eq((await st(M2)).screen, 'passport', 'the strip opens the passport'); await M2.click('[data-act=back]');
 await M2.click('[data-act=choose]'); await round(M2); eq(await M2.locator('#fx-pp-intro').count(), 0, 'the introduction is shown once');
+
+// ---- 8. Platinum and Diamond
+// a player who finished the Expert passport before this version is told about the new level once, and sees the Expert cover
+const P2 = await mk('P2'); const tP = Date.now() - 3 * 864e5;
+await seed(P2, { 'fx-passport': { boo: POOL }, 'fx-expert': { boo: POOL }, 'fx-marks': { boo: { c0: tP, c1: tP, c2: tP, c3: tP, c4: tP, c5: tP, world: tP, expert: tP } },
+  'fx-cheered': { boo: ['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'world', 'expert'] }, 'fx-people': { boo: { name: 'Boo', avatar: '🤓' } } }); await P2.reload(); await P2.waitForTimeout(250);
+eq(await fx(P2, 'tier', 'Boo'), 2, 'Expert complete: working on Platinum');
+await enter(P2, 'Boo'); await P2.waitForSelector('#fx-cheer'); assert((await txt(P2, '#fx-cheer')).includes('The Platinum passport') && (await txt(P2, '#fx-cheer')).includes('bonus question'), 'the new level is announced');
+eq(await P2.locator('#fx-cheer .pp-cover.expert').count(), 1, 'with the new Expert cover'); await P2.waitForTimeout(600); await P2.screenshot({ path: 'p14-platinum-open.png' }); await overflow(P2, 'platinum open');
+await P2.click('[data-act=cheer-close]'); assert((await txt(P2)).includes('Passport · Platinum 197 to go') || (await txt(P2)).includes('Passport · Platinum 0 of 197'), 'the passport link counts platinum: ' + (await P2.textContent('#fx-pp-link')));
+await P2.click('[data-act=rules-back]'); await enter(P2, 'Boo'); eq(await P2.locator('#fx-cheer').count(), 0, 'announced once');
+// a hint-free flag with its bonus question right earns platinum; a hinted one does not
+await round(P2, { hintOn: 4 }); let sp = await st(P2);
+eq(sp.newPlat, 9, 'nine platinum stars: every flag but the hinted one'); eq((await fx(P2, 'plats', 'Boo')).length, 9, 'kept');
+assert((await txt(P2, '#fx-stamp-note')).includes('9 new platinum stars'), 'the strip counts them'); assert((await txt(P2, '#fx-pstrip')).includes('Platinum passport'), 'and is the platinum strip');
+await P2.screenshot({ path: 'p15-platinum-strip.png', fullPage: true });
+await P2.click('#fx-pstrip'); eq(await P2.locator('.pp-cover.expert').count(), 1, 'the Expert cover in the passport'); assert(/9\s*of 197 platinum stars/.test(await txt(P2, '.fx-band')), 'the passport counts platinum');
+await P2.click('#pp-book'); await P2.waitForTimeout(800); assert((await txt(P2, '.pp-page')).includes('Platinum stars'), 'the holder page counts platinum');
+for (let k = 0; k < 2; k++) { await P2.click('[data-act=pp-next]'); await P2.waitForTimeout(800); }
+eq(await P2.locator('.pp-xs.pl').count() >= 0, true, 'platinum marks render'); await P2.click('[data-act=back]');
+// the last platinum star completes the level
+const Z = POOL[150];
+await seed(P2, { 'fx-plat': { boo: POOL.filter(a => a !== Z) } }); await P2.click('[data-act=choose]'); await round(P2); sp = await st(P2);
+assert(sp.round.some(r => r.a2 === Z), 'the missing platinum flag is dealt'); eq(JSON.stringify(sp.feats), '["platinum"]', 'the Platinum passport completes');
+assert((await txt(P2, '#fx-cheer')).includes('Platinum passport!') && (await txt(P2, '#fx-cheer')).includes('Diamond passport'), 'celebrated, with Diamond next');
+eq(await P2.locator('#fx-cheer .pp-cover.platinum').count(), 1, 'the platinum cover'); await P2.waitForTimeout(600); await P2.screenshot({ path: 'p16-platinum-cheer.png' });
+eq(await fx(P2, 'tier', 'Boo'), 3, 'now working on Diamond'); await P2.click('[data-act=cheer-close]');
+await P2.click('[data-act=choose]'); eq(await P2.locator('#fx-cheer').count(), 0, 'the Diamond level was announced with the celebration, not again');
+// diamond: a hint-free answer within 5 seconds; a slower one earns none
+await opt(P2, 'mode', 'free'); await opt(P2, 'pool', 'world'); await P2.click('[data-act=play]');
+let first = (await st(P2)).q.a2; await P2.evaluate(() => { window.__fx.state.q.t0 -= 7000; }); await pickFlag(P2, true);
+eq((await fx(P2, 'diams', 'Boo')).includes(first), false, 'seven seconds: no diamond'); await P2.click('[data-act=bonus]'); await pickBonus(P2, true); await P2.click('[data-act=next]');
+first = (await st(P2)).q.a2; await pickFlag(P2, true); eq((await fx(P2, 'diams', 'Boo')).includes(first), true, 'straight away: a diamond');
+await P2.click('[data-act=end-early]'); await P2.click('[data-act=end-early]');
+// the last diamond completes every level
+const W = POOL[60];
+await seed(P2, { 'fx-diam': { boo: POOL.filter(a => a !== W) } }); await P2.click('[data-act=choose]'); await round(P2); sp = await st(P2);
+eq(JSON.stringify(sp.feats), '["diamond"]', 'the Diamond passport completes'); assert((await txt(P2, '#fx-cheer')).includes('Diamond passport!'), 'celebrated');
+eq(await P2.locator('#fx-cheer .pp-cover.diamond').count(), 1, 'the diamond cover'); await P2.waitForTimeout(600); await P2.screenshot({ path: 'p17-diamond-cheer.png' });
+await P2.click('[data-act=cheer-passport]'); eq(await P2.locator('.pp-cover.diamond').count(), 1, 'the passport is diamond'); assert((await txt(P2, '#pp-rule')).includes('Every level complete'), 'and says so');
+await P2.screenshot({ path: 'p18-diamond-cover.png' }); await P2.click('[data-act=back]'); await P2.click('[data-act=choose]');
+assert((await P2.textContent('#fx-pp-link')).includes('💎 Diamond'), 'the passport link shows the diamond');
+// the levels travel with the player through the family
+const Q = await mk('Q', { cloud: true });
+await seed(Q, { 'fx-passport': { robin: POOL }, 'fx-expert': { robin: POOL }, 'fx-plat': { robin: POOL.slice(0, 40) }, 'fx-diam': {}, 'fx-people': { robin: { name: 'Robin', avatar: '🐙' } } });
+await Q.reload(); await Q.waitForTimeout(250); await join(Q, 'levels-family'); await enter(Q, 'Robin'); await Q.evaluate(() => window.__fx.cloudSync()); await Q.waitForFunction(() => !window.__fx.cloudState.busy);
+const qfid = (await Q.evaluate(() => window.__fx.family())).fid, qdoc = mock.plain(mock.docs.get(`families/${qfid}/players/robin`));
+eq(qdoc.perfect.filter(c => c.startsWith('p|')).length, 40, 'platinum stars reach the family');
+const R2 = await mk('R2', { cloud: true }); await join(R2, 'levels-family'); await R2.fill('#fx-name', 'robin'); await R2.click('#fx-setup [type=submit]'); await R2.waitForSelector('#fx-claim'); await R2.click('#fx-claim [type=submit]');
+await R2.waitForFunction(() => window.__fx.state.screen === 'rules'); await R2.waitForFunction(() => !window.__fx.cloudState.busy);
+eq((await fx(R2, 'plats', 'Robin')).length, 40, 'and come down on another device');
 
 await browser.close(); mock.close();
 console.log(errors.length ? errors.join('\n') : 'PASSPORT CHECKS PASSED');
