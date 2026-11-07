@@ -153,5 +153,44 @@ put('2026-10-17', row('Robin', 1200, 12));
 await C.click('[data-act=family]'); await C.click('[data-act=family-leave]'); await C.click('[data-act=family-leave]');
 eq(await wins(C, 'all'), '1 Casey 2/2', 'after leaving, the device counts its own days');
 
+// ---- 3. win streaks from 8 November: +250 at three wins in a row, +500 at five and every fifth after, +250 for breaking a streak of three or more
+const S2 = await device('S2', false, '2026-11-23');
+const days = {}, put2 = (day, ...rs) => { days[day] = rs; };
+put2('2026-11-07', row('Alex', 900, 100), row('Robin', 100, 101));                   // before streaks count: no part of any streak
+put2('2026-11-08', row('Alex', 900, 102), row('Robin', 100, 103));
+put2('2026-11-09', row('Alex', 900, 104), row('Robin', 100, 105));
+put2('2026-11-10', row('Alex', 900, 106), row('Robin', 100, 107));                   // Alex: three in a row, +250
+put2('2026-11-11', row('Alex', 100, 108), row('Robin', 900, 109));                   // Robin wins with Alex playing: breaks it, +250
+put2('2026-11-12', row('Robin', 800, 110), row('Alex', 800, 111));                   // a shared win (no times): both win, Robin 2 in a row
+put2('2026-11-13', row('Robin', 900, 112), row('Alex', 100, 113));                   // Robin: three in a row (11, 12, 13), +250
+put2('2026-11-14', row('Robin', 900, 114));                                           // four
+put2('2026-11-15', row('Casey', 300, 115));                                            // Robin did not play: Casey breaks it, +250
+put2('2026-11-16', row('Casey', 300, 116)); put2('2026-11-17', row('Casey', 300, 117)); // Casey 3 in a row on the 17th, +250
+put2('2026-11-18', row('Casey', 300, 118)); put2('2026-11-19', row('Casey', 300, 119)); // Casey 5 in a row on the 19th, +500
+// 20 November: nobody played, every streak ends, no one gets a breaker bonus
+put2('2026-11-21', row('Robin', 500, 120)); put2('2026-11-22', row('Robin', 500, 121)); // Robin 2 in a row
+await S2.evaluate(d => localStorage.setItem('fx-days', JSON.stringify(d)), days); await S2.reload(); await S2.waitForTimeout(250);
+const ev = await S2.evaluate(() => { const sk = window.__fx.streaksOf(window.__fx.daysBook()); return { ev: Object.fromEntries([...sk.events].map(([d, list]) => [d, list.map(e => `${e.kind}:${e.name}:${e.n}:${e.pts}${e.of ? ':' + e.of : ''}`).join('|')])), cur: [...sk.current] }; });
+eq(ev.ev['2026-11-08'], undefined, 'the 8th starts a streak'); eq(ev.ev['2026-11-09'], 'run:Alex:2:0', 'two in a row is noted, no bonus');
+eq(ev.ev['2026-11-10'], 'run:Alex:3:250', 'three in a row: +250 (the 7th does not count)');
+eq(ev.ev['2026-11-11'], 'break:Robin:3:250:Alex', 'beating a three-day streak: +250');
+eq(ev.ev['2026-11-12'], 'run:Robin:2:0', 'a shared win counts as a win for each');
+eq(ev.ev['2026-11-13'], 'run:Robin:3:250', 'Robin three in a row through a shared win'); eq(ev.ev['2026-11-14'], 'run:Robin:4:0', 'four');
+eq(ev.ev['2026-11-15'], 'break:Casey:4:250:Robin', 'the streak holder not playing: the day’s winner still breaks it');
+eq(ev.ev['2026-11-17'], 'run:Casey:3:250', 'Casey three'); eq(ev.ev['2026-11-18'], 'run:Casey:4:0', 'four: noted, no bonus'); eq(ev.ev['2026-11-19'], 'run:Casey:5:500', 'five: +500');
+eq(ev.ev['2026-11-21'], undefined, 'after a day nobody played, no breaker bonus and streaks start again');
+eq(JSON.stringify(ev.cur), JSON.stringify([['robin', 2]]), 'Robin is on a streak of two');
+const nov = await S2.evaluate(() => window.__fx.winsTable('2026-11', undefined, 'points').map(e => `${e.name} ${e.points} +${e.bonus} 🔥${e.streak}`).join(' | '));
+assert(nov.includes('Casey 2500 +1000 🔥0') && nov.includes('Alex 4850 +250 🔥0') && nov.includes('Robin 5400 +500 🔥2'), 'bonuses are added to the month’s points: ' + nov);
+await openWins(S2); await S2.click('[data-act=rank][data-v=points]'); assert((await txt(S2, '#fx-wins')).includes('🔥2') && (await txt(S2, '#fx-wins')).includes('+1,000 bonus'), 'the standings show the streak and the bonus');
+assert((await txt(S2, '#fx-streak-key')).includes('+250'), 'and explain the streak rules'); await S2.screenshot({ path: 'v8-streaks.png', fullPage: true }); await overflow(S2, 'streaks');
+const t11 = await S2.evaluate(() => window.__fx.dayText('2026-11-11'));
+assert(t11.includes("💥 Robin ended Alex's 3-day win streak! +250"), 'the copied results announce the break: ' + t11.split('\n').slice(3, 6).join(' / '));
+const t19 = await S2.evaluate(() => window.__fx.dayText('2026-11-19')); assert(t19.includes('🔥 Casey: 5 wins in a row! +500') && t19.includes('(incl. +1,000 bonus)'), 'and a five-day streak, with the bonus in the points');
+const t09 = await S2.evaluate(() => window.__fx.dayText('2026-11-09')); assert(t09.includes('🔥 Alex has won 2 in a row'), 'two in a row builds suspense');
+await setDay(S2, '2026-11-25'); await S2.reload(); await S2.waitForTimeout(250);
+eq(await S2.evaluate(() => [...window.__fx.streaksOf(window.__fx.daysBook()).current].length), 0, 'days nobody played end a streak, even after the last scores');
+const t31 = await S2.evaluate(() => window.__fx.dayText('2026-10-14')); assert(!t31.includes('🔥') && !t31.includes('💥'), 'nothing before streaks began');
+
 await browser.close(); mock.close();
 console.log(errors.length ? errors.join('\n') : 'DAILY WINS CHECKS PASSED');

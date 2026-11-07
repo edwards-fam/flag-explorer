@@ -209,6 +209,7 @@
   .fx-feat.big { padding: 1.1rem 1.15rem 1.15rem; border-width: 3px; }
   .fx-feat.big h2 { font-size: clamp(1.9rem, 9vw, 2.6rem); margin-top: .2rem; }
   .fx-feat p { margin-top: .4rem; font-size: .95rem; line-height: 1.4; }
+  .fx-streak { font-family: var(--font-data); font-weight: 600; font-size: .78rem; color: var(--ochre); }
   /* Groups */
   .fx-group { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .65rem .85rem; border: 2px solid var(--rule); border-radius: 14px; }
   .fx-group.on { border-color: var(--gold); background: var(--gold-tint); }
@@ -784,18 +785,43 @@
   const dayWinners = rows => { const top = rows.filter(r => r.score === Math.max(...rows.map(x => x.score))), fast = Math.min(...top.map(timeOf)); return top.filter(r => timeOf(r) === fast); };
   // Standings for a span of days: 'all', or a month as 'YYYY-MM', ranked by days won or by points added up over every day played.
   // Equal standing shares a place.
+  /* Win streaks, from STREAK_FROM. Winning the day several days running earns points on top of the scores: +250 on the
+     third win in a row, +500 on the fifth and on every fifth after that. A day not won, or not played, ends a streak;
+     a day nobody played ends every streak. Whoever wins the day that ends a streak of three or more gets +250 for breaking it,
+     whether or not the player on the streak played. Like the wins, all of it is worked out from the days' scores. */
+  const STREAK_FROM = '2026-11-08';
+  const STREAK_PTS = n => n === 3 ? 250 : n >= 5 && n % 5 === 0 ? 500 : 0, BREAK_PTS = 250, BREAK_AT = 3;
+  function streaksOf(book, until = dayShift(todayKey(), -1)) {      // until: the last day counted (a day nobody played still ends streaks)
+    const events = new Map(), bonus = new Map(), run = new Map(), names = new Map(), dates = [...book.keys()].filter(k => k >= STREAK_FROM).sort();
+    const add = (date, ev) => { events.set(date, [...(events.get(date) || []), ev]); if (ev.pts) { const b = bonus.get(date) || new Map(); b.set(ev.pid, (b.get(ev.pid) || 0) + ev.pts); bonus.set(date, b); } };
+    if (dates.length) for (let k = dates[0]; k <= until; k = dayShift(k, 1)) {
+      const rows = book.get(k) || [], won = rows.length ? dayWinners(rows) : [], ids = new Set(won.map(r => pidOf(r.name)));
+      rows.forEach(r => names.set(pidOf(r.name), r.name));
+      const broken = [...run].filter(([pid, n]) => n >= BREAK_AT && !ids.has(pid));
+      for (const [pid] of [...run]) if (!ids.has(pid)) run.delete(pid);
+      for (const r of won) {
+        const pid = pidOf(r.name), n = (run.get(pid) || 0) + 1; run.set(pid, n);
+        if (n >= 2) add(k, { kind: 'run', pid, name: r.name, n, pts: STREAK_PTS(n) });
+      }
+      for (const [pid, n] of broken) for (const r of won) add(k, { kind: 'break', pid: pidOf(r.name), name: r.name, of: names.get(pid) || pid, n, pts: BREAK_PTS });
+    }
+    const current = new Map([...run].filter(([, n]) => n >= 2));      // as the last finished day left them
+    return { events, bonus, current };
+  }
   function winsTable(span, book = daysBook(), by = 'wins') {
-    const who = new Map();
+    const who = new Map(), sk = streaksOf(book);
     for (const [date, rows] of book) {
       if (span !== 'all' && !date.startsWith(span)) continue;
-      const won = dayWinners(rows);
+      const won = dayWinners(rows), extra = sk.bonus.get(date) || new Map();
       for (const r of rows) {
-        const k = pidOf(r.name), e = who.get(k) || { name: r.name, avatar: r.avatar, wins: 0, points: 0, played: 0, t: 0 };
+        const k = pidOf(r.name), e = who.get(k) || { name: r.name, avatar: r.avatar, wins: 0, points: 0, played: 0, t: 0, bonus: 0, streak: 0 };
         if (r.t >= e.t) { e.name = r.name; e.avatar = r.avatar; e.t = r.t; }       // the name and picture they used most recently
         e.played++; e.points += Math.max(0, r.score); if (won.includes(r)) e.wins++;
+        if (extra.has(k)) { e.points += extra.get(k); e.bonus += extra.get(k); }
         who.set(k, e);
       }
     }
+    for (const [k, n] of sk.current) if (who.has(k)) who.get(k).streak = n;
     const key = by === 'points' ? 'points' : 'wins', other = key === 'wins' ? 'points' : 'wins';
     const list = [...who.values()].sort((a, b) => b[key] - a[key] || b[other] - a[other] || b.played - a.played || (plain(a.name) < plain(b.name) ? -1 : 1));
     list.forEach((e, i) => { e.place = i && list[i - 1][key] === e[key] ? list[i - 1].place : i + 1; });
@@ -1649,13 +1675,16 @@
     const head = won.length > 1 ? `🏆 ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]} tie for the win with ${fmt(won[0].score)}!`
       : `🏆 ${names[0]} wins with ${fmt(won[0].score)}${Number.isInteger(won[0].ms) ? ` in ${timeText(won[0].ms)}` : ''}!${level ? ' The tie went to the faster time.' : ''}`;
     const sofar = book.size ? [...book.keys()].filter(k => k.startsWith(month) && k <= date) : [];
-    const pts = winsTable(month, new Map([...book].filter(([k]) => sofar.includes(k))), 'points');
-    const board = pts.slice(0, 10).map(e => `${e.place}. ${e.avatar} ${e.name} ${fmt(e.points)}`);
+    const upTo = new Map([...book].filter(([k]) => k <= date)), pts = winsTable(month, upTo, 'points');      // streaks may run in from the month before
+    const board = pts.slice(0, 10).map(e => `${e.place}. ${e.avatar} ${e.name} ${fmt(e.points)}${e.bonus ? ` (incl. +${fmt(e.bonus)} bonus)` : ''}`);
     if (pts.length > 10) board.push(`…and ${plural(pts.length - 10, 'more player')}`);
     const monthOver = todayKey().slice(0, 7) > month, lastHere = sofar[sofar.length - 1] === date && ![...book.keys()].some(k => k.startsWith(month) && k > date);
     const span = monthOver && lastHere ? ', final' : !monthOver && lastHere ? ' so far' : ` up to ${dayLabel(date).replace(/^[A-Za-z]+ /, '')}`;
     const link = /^https:$/.test(location.protocol) ? location.href.split(/[?#]/)[0] : '';
     const feats = featsOn(date).map(featLine);
+    const runs = (streaksOf(upTo, date).events.get(date) || []).map(ev => ev.kind === 'break' ? `💥 ${ev.name} ended ${ev.of}'s ${ev.n}-day win streak! +${ev.pts}`
+      : ev.pts ? `🔥 ${ev.name}: ${ev.n} wins in a row! +${ev.pts}` : `🔥 ${ev.name} has won ${ev.n} in a row`);
+    feats.unshift(...runs);
     return [`🌍 Flag Explorer · ${many() ? family().name : `Today's challenge`}`, dayLabel(date), '', head, ...(feats.length ? ['', ...feats] : []), '', ...lines, '', `📊 ${monthName} points${span}`, ...board,
       ...(link ? ['', `Play today's flags: ${link}`] : [])].join('\n');
   }
@@ -1669,7 +1698,7 @@
     const rows = (list.length ? list.slice(0, 30) : [null, null, null]).map((e, i) => `<li class="fx-hrow ${e ? '' : 'empty'} ${e && e.place === 1 ? 'top' : ''}">
         <span class="fx-hrank">${e ? ordinal(e.place) : ORD[i]}</span>
         <span class="fx-ava ${e ? '' : 'blank'}" style="--s:2.1rem" aria-hidden="true">${e ? esc(e.avatar) : ''}</span>
-        <span class="min-w-0"><span class="fx-clip whitespace-nowrap block ${e ? 'font-medium' : ''}">${e ? esc(e.name) : '· · ·'}</span>${e ? `<span class="fx-label block" style="margin-top:.1rem">${plural(e.played, 'day')} · <span class="whitespace-nowrap">${byPoints ? plural(e.wins, 'win') : fmt(e.points) + ' pts'}</span></span>` : ''}</span>
+        <span class="min-w-0"><span class="flex items-center gap-1.5 min-w-0"><span class="fx-clip whitespace-nowrap min-w-0 ${e ? 'font-medium' : ''}">${e ? esc(e.name) : '· · ·'}</span>${e && e.streak ? `<span class="fx-streak flex-none" title="${e.streak} wins in a row">🔥${e.streak}</span>` : ''}</span>${e ? `<span class="fx-label block" style="margin-top:.1rem">${plural(e.played, 'day')} · <span class="whitespace-nowrap">${byPoints ? plural(e.wins, 'win') : fmt(e.points) + ' pts'}</span>${byPoints && e.bonus ? ` · <span class="whitespace-nowrap">+${fmt(e.bonus)} bonus</span>` : ''}</span>` : ''}</span>
         <span class="fx-num text-lg">${e ? fmt(byPoints ? e.points : e.wins) : ''}</span>
       </li>`).join('');
     const foot = !list.length ? (all ? 'No finished days yet.' : `No finished days in ${monthName} yet.`)
@@ -1701,7 +1730,8 @@
       ${family() ? `<p class="text-sm text-ink-soft text-center mt-4" id="fx-cloud-note" role="status">${cloudNote()}</p>` : ''}
       <p class="text-sm text-ink-soft text-center mt-2" id="fx-wins-key">${byPoints
         ? `Points add up every score in Today's challenge, so every day played counts. Only the first try each day is scored. Today's score is added at midnight.`
-        : `The top score in Today's challenge wins the day. Level on points, the faster time wins; level on both, each player gets a win. Today's winner is counted at midnight.`}</p>`;
+        : `The top score in Today's challenge wins the day. Level on points, the faster time wins; level on both, each player gets a win. Today's winner is counted at midnight.`}</p>
+      <p class="text-sm text-ink-soft text-center mt-2" id="fx-streak-key">🔥 Win streaks: win ${BREAK_AT} days in a row for +${STREAK_PTS(3)} points, and 5 in a row for +${STREAK_PTS(5)} more (again every 5 after that). Win the day that ends someone's streak of ${BREAK_AT} or more for +${BREAK_PTS}, even if they did not play.</p>`;
   }
 
   // The high-score tables: a ledger of ten lines per table, the newest entry marked
@@ -2531,6 +2561,6 @@
   if (hot && hot.snapshot) hot.snapshot(() => ({ S, P, M }));
   if (hot && hot.ready) hot.ready(data => boot(data || liveSaved())); else boot((hot && hot.data) || liveSaved());
 
-  window.__fx = { tier, plats, diams, coverHTML, showGroup, playedToday, groups, stampNote, ppLinkText, owed, timeText, dayWinners, DAY_CLOCK, DAY_CLOCK_FROM, byScore, experts, achieved, newMarks, stillMissing, passportDone, featsOn, CONT_CODES, POOL, dayText, winsTable, daysBook, dayShift, family, cloudSync, cloudState, pidOf, perfects, deck, markSeen, seenList, get match() { return M; }, standings, fitOpts, get sound() { return { ac, master, keepAlive, IOS }; }, ppPages, flagWorth, streakBonus, speedBonus, totals, entryTotal, get state() { return S; }, get player() { return P; }, get opts() { return O; }, C, POOLS, KNOWN, buildRound, tableRows, stamps, shareText, todayKey, AVATARS };
+  window.__fx = { streaksOf, tier, plats, diams, coverHTML, showGroup, playedToday, groups, stampNote, ppLinkText, owed, timeText, dayWinners, DAY_CLOCK, DAY_CLOCK_FROM, byScore, experts, achieved, newMarks, stillMissing, passportDone, featsOn, CONT_CODES, POOL, dayText, winsTable, daysBook, dayShift, family, cloudSync, cloudState, pidOf, perfects, deck, markSeen, seenList, get match() { return M; }, standings, fitOpts, get sound() { return { ac, master, keepAlive, IOS }; }, ppPages, flagWorth, streakBonus, speedBonus, totals, entryTotal, get state() { return S; }, get player() { return P; }, get opts() { return O; }, C, POOLS, KNOWN, buildRound, tableRows, stamps, shareText, todayKey, AVATARS };
 })();
 </script>
