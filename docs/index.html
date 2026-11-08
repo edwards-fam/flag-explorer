@@ -248,6 +248,10 @@
   .fx-feat.big h2 { font-size: clamp(1.9rem, 9vw, 2.6rem); margin-top: .2rem; }
   .fx-feat p { margin-top: .4rem; font-size: .95rem; line-height: 1.4; }
   .fx-streak { font-family: var(--font-data); font-weight: 600; font-size: .78rem; color: var(--ochre); }
+  /* How points work, folded away on the Choose your game screen until asked for */
+  .fx-howbtn { display: flex; width: 100%; align-items: baseline; justify-content: space-between; gap: .75rem; padding: .35rem 0; color: var(--ink); text-align: left; cursor: pointer; }
+  .fx-howbtn .fx-label { color: var(--ochre); }
+  #fx-how { margin-top: .4rem; }
   /* Groups */
   .fx-group { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .65rem .85rem; border: 2px solid var(--rule); border-radius: 14px; }
   .fx-group.on { border-color: var(--gold); background: var(--gold-tint); }
@@ -1659,8 +1663,9 @@
         <div><p class="fx-label" id="fx-pool-l">Flags</p><div class="grid grid-cols-2 gap-2 mt-1" role="group" aria-labelledby="fx-pool-l">${pick('pool', 'known', `Well-known · ${POOLS.known.codes.length}`)}${pick('pool', 'world', `Whole world · ${POOL.length}`)}</div></div>
         <div><p class="fx-label" id="fx-clock-l">Clock</p><div class="grid grid-cols-2 gap-2 mt-1" role="group" aria-labelledby="fx-clock-l">${pick('clock', 'false', 'No clock')}${pick('clock', 'true', `${CLOCK} seconds a flag`)}</div></div>
       </div>`}
-      <hr class="fx-rule my-6">
-      <h2 class="fx-h text-2xl">How points work</h2>
+      <hr class="fx-rule my-5">
+      <button type="button" class="fx-howbtn" data-act="how" aria-expanded="${!!S.how}" aria-controls="fx-how" id="fx-how-btn"><span class="fx-h text-xl">How points work</span><span class="fx-label">${S.how ? 'Hide ▴' : 'Show ▾'}</span></button>
+      <div id="fx-how" ${S.how ? '' : 'hidden'}>
       <table class="fx-ledger w-full mt-2 text-[.97rem]">
         <tr><th scope="row">Name the flag with no help</th><td>${BASE}</td></tr>
         <tr><th scope="row">Hint: reveal the continent</th><td class="text-madder">−${HINTS[0].cost}</td></tr>
@@ -1676,6 +1681,7 @@
       <p class="text-ink-soft text-sm mt-2">The streak counts flags named with no hints, one after another. A hint or a miss sends it back to zero. Its bonus grows to +${STREAK[1][1]} at ${STREAK[1][0]} in a row and +${STREAK[0][1]} at ${STREAK[0][0]}. Before the last flag you may risk points on it; a wagered flag allows no hints.${clock ? ` Run out of time and the flag counts as a miss.` : ''}</p>
       ${daily && dayTimed() ? `<p class="fx-tip" style="margin-top:.9rem" id="fx-day-clock"><b>Against the clock:</b> you have ${DAY_CLOCK} seconds for each flag and each bonus question, hints included. Run out of time and it counts as a miss. The clock keeps running if you leave the game. There are no points for speed, but your total time is recorded, and when two players finish level on points the faster time wins the day.</p>` : ''}
       <p class="fx-tip" style="margin-top:.9rem" id="fx-perfect-rule">${STAR} <b>Perfect round:</b> name all ${ROUND} flags and answer all ${ROUND} bonus questions in one round for a gold stamp in your passport and a gold star on the high scores. The final wager does not count either way.</p>
+      </div>
       ${party ? `<p class="text-ink-soft text-sm mt-2">Pass and play: each turn is one flag, then the device goes to the next player. Everyone gets different flags of matching difficulty, and each player has their own hints, streak and final-flag wager. Games of ${ROUND} flags each also count for the high scores table.</p>` : ''}
       <button class="fx-go mt-6" data-act="play" data-primary>Start playing</button>
       <div class="flex flex-wrap justify-center gap-x-7 mt-3"><button class="fx-quiet" data-act="rules-back">Back</button><button class="fx-quiet" data-act="passport" id="fx-pp-link">Passport · ${ppLinkText(P.name)}</button>${textBtn()}</div>
@@ -2521,6 +2527,7 @@
     if (act === 'rules-back') { S.screen = 'start'; return go(); }
     if (act === 'choose') { const party = !!M; openRules(); if (party) O.mode = 'party'; return go(); }
     if (act === 'board') { S.back = S.screen; S.screen = 'board'; S.confirmWipe = false; S.tab = S.back === 'end' || S.back === 'match' ? S.table : S.tab || O.pool; cloudSoon(); return go(); }
+    if (act === 'how') { S.how = !S.how; SFX.tap(); return render(false); }
     if (act === 'cheer-close') { S.cheer = null; SFX.tap(); return render(false); }
     if (act === 'passport' || act === 'cheer-passport') { S.cheer = null; S.back = S.screen; S.screen = 'passport'; S.pp = 0; turning = false; return go(); }
     if (act === 'pp-next') return turnTo(S.pp + 1);
