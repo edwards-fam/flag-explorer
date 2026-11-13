@@ -57,7 +57,7 @@ const a = await daily(A, 2, 1);
 eq(a.score, 1680, 'every answer right scores what it always did'); eq(a.log.reduce((s, e) => s + e.speedPts, 0), 0, 'no speed points');
 eq(a.ms, 30000, 'the time: 2 seconds a flag and 1 a bonus question, ten times, and nothing for the wager or the results');
 eq((await txt(A, '#fx-time')).replace(/\s+/g, ' ').trim(), 'Time 30.0 s · breaks a tie', 'the results show the time');
-assert((await A.evaluate(() => window.__fx.shareText())).includes('scored 1,680 in 30.0 s'), 'the shared result carries the time');
+
 await A.screenshot({ path: 't2-end-time.png', fullPage: true }); await overflow(A, 'end');
 const row = await A.evaluate(() => window.__fx.tableRows('daily')[0]); eq(row.ms, 30000, 'today’s table keeps the time'); eq(row.clock, false, 'and is not marked as a free-play clock round');
 eq(JSON.parse(await A.evaluate(() => localStorage.getItem('fx-days')))['2026-10-24'][0].ms, 30000, 'the day log keeps it for the wins');

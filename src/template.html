@@ -2114,12 +2114,7 @@
       ${S.screen === 'play' ? `<div class="flex flex-wrap justify-between gap-x-7 mt-2">${endEarlyBtn()}${textBtn()}</div>` : ''}`;
   }
 
-  // What a player pastes into the family chat after today's challenge.
-  function shareText() {
-    const t = totals(S.log);
-    const grid = S.round.map((_, i) => { const e = S.log[i]; return !e ? '⬜' : !e.ok ? '🟥' : e.hints.length ? '🟨' : '🟩'; }).join('');
-    return `Flag Explorer · ${todayLabel()}\n${P.avatar} ${P.name} scored ${fmt(S.score)}${S.limit && S.mode === 'daily' ? ` in ${timeText(S.ms || 0)}` : ''}\n${grid}\nBonus questions ${t.bonusWon} of ${S.round.length} · best streak ${S.topStreak}${S.perfect ? '\n⭐ Perfect round' : ''}`;
-  }
+
 
   // What a round added to the passport, and how close the next finish line is
   // The passport strip on the results screen: what the round added, how far along the passport is, and the countdown.
@@ -2230,11 +2225,7 @@
         <p class="font-script text-lg mt-4">${summary}</p>
         ${stampNote(S, P.name)}
         ${(S.feats || []).map(featBlock).join('')}
-        ${daily && !S.practice ? `<h2 class="fx-label mt-6">Share today's result</h2>
-          <pre class="fx-share mt-1" id="fx-share">${esc(shareText())}</pre>
-          <button class="fx-go mt-3" data-act="copy" data-primary>Copy result</button>
-          <button class="fx-quiet block mx-auto mt-3" data-act="choose">Choose another game</button>`
-          : daily ? `<button class="fx-go mt-6" data-act="choose" data-primary>Choose another game</button>`
+        ${daily ? `<button class="fx-go mt-6" data-act="choose" data-primary>Choose another game</button>`
           : `<button class="fx-go mt-6" data-act="again" data-primary>Play again as ${esc(P.name)}</button>
           <button class="fx-quiet block mx-auto mt-3" data-act="choose">Choose another game</button>`}
         <div class="flex flex-wrap justify-center gap-x-7 mt-1"><button class="fx-quiet" data-act="board">High scores</button><button class="fx-quiet" data-act="passport">Passport</button><button class="fx-quiet" data-act="change-player">Change player</button></div>
@@ -2453,7 +2444,6 @@
     };
     try { navigator.clipboard.writeText(text).then(() => { btn.textContent = 'Copied'; }, select); } catch (e) { select(); }
   }
-  const copyResult = btn => copyText(btn, shareText(), '#fx-share');
 
   app.addEventListener('click', ev => {
     const el = ev.target.closest('[data-act]');
@@ -2461,7 +2451,6 @@
     const act = el.dataset.act;
     if (act === 'avatar') return setAvatar(el.dataset.e);
     if (act === 'shuffle') { S.hand = dealHand(); app.querySelector('#fx-hand').innerHTML = viewHand(); return; }
-    if (act === 'copy') return copyResult(el);
     if (act === 'credits') { S.credits = !S.credits; return render(false); }
     if (act === 'copy-day') return copyText(el, dayText(el.dataset.v), '#fx-day-share');
     if (act === 'send-day') { navigator.share({ text: dayText(el.dataset.v) }).catch(() => {}); return; }
@@ -2577,6 +2566,6 @@
   if (hot && hot.snapshot) hot.snapshot(() => ({ S, P, M }));
   if (hot && hot.ready) hot.ready(data => boot(data || liveSaved())); else boot((hot && hot.data) || liveSaved());
 
-  window.__fx = { streaksOf, tier, plats, diams, coverHTML, showGroup, playedToday, groups, stampNote, ppLinkText, owed, timeText, dayWinners, DAY_CLOCK, DAY_CLOCK_FROM, byScore, experts, achieved, newMarks, stillMissing, passportDone, featsOn, CONT_CODES, POOL, dayText, winsTable, daysBook, dayShift, family, cloudSync, cloudState, pidOf, perfects, deck, markSeen, seenList, get match() { return M; }, standings, fitOpts, get sound() { return { ac, master, keepAlive, IOS }; }, ppPages, flagWorth, streakBonus, speedBonus, totals, entryTotal, get state() { return S; }, get player() { return P; }, get opts() { return O; }, C, POOLS, KNOWN, buildRound, tableRows, stamps, shareText, todayKey, AVATARS };
+  window.__fx = { streaksOf, tier, plats, diams, coverHTML, showGroup, playedToday, groups, stampNote, ppLinkText, owed, timeText, dayWinners, DAY_CLOCK, DAY_CLOCK_FROM, byScore, experts, achieved, newMarks, stillMissing, passportDone, featsOn, CONT_CODES, POOL, dayText, winsTable, daysBook, dayShift, family, cloudSync, cloudState, pidOf, perfects, deck, markSeen, seenList, get match() { return M; }, standings, fitOpts, get sound() { return { ac, master, keepAlive, IOS }; }, ppPages, flagWorth, streakBonus, speedBonus, totals, entryTotal, get state() { return S; }, get player() { return P; }, get opts() { return O; }, C, POOLS, KNOWN, buildRound, tableRows, stamps, todayKey, AVATARS };
 })();
 </script>

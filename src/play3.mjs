@@ -86,9 +86,8 @@ const known = await p.evaluate(()=>window.__fx.tableRows('known')); eq(known.len
 await p.click('[data-act=choose]'); await p.click('[data-act=play]'); s = await st(p); eq(s.mode,'daily','daily'); eq(s.practice,false,'first try counts'); eq(s.clock,false,'daily has no clock');
 const dailyRound = JSON.stringify(s.round);
 await perfect(p,10); s = await st(p); eq(s.score,2180-500-0, 'perfect untimed round without a wager = 1680');
-assert(await p.locator('#fx-share').count()===1,'share box'); console.log((await p.textContent('#fx-share')).replace(/\n/g,' | '));
+assert(await p.locator('#fx-share').count()===0,'no share box after the daily'); eq(await p.getAttribute('[data-primary]','data-act'),'choose','Choose another game leads');
 await p.waitForTimeout(3000); await p.screenshot({path:'u12-daily-end.png'}); await overflow(p,'daily end');
-await p.click('[data-act=copy]'); await p.waitForTimeout(200); console.log('copy button says:', await p.textContent('[data-act=copy]'));
 await p.click('[data-act=board]'); assert(await p.locator('[data-act=tab][aria-pressed=true]').textContent()==='Today','today tab'); eq(await p.locator('.fx-hrow:not(.empty)').count(),1,'daily row');
 await p.click('[data-act=tab][data-v=known]'); eq(await p.locator('.fx-hrow:not(.empty)').count(),1,'known tab row'); await p.screenshot({path:'u13-board-known.png', fullPage:true});
 await p.click('[data-act=back]'); await p.click('[data-act=choose]'); eq(await p.evaluate(()=>window.__fx.opts.mode),'free','free preselected once daily is played');
