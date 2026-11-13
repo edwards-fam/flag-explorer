@@ -1,7 +1,7 @@
 import { chromium } from 'playwright';
 import path from 'path';
 const url = 'file://' + path.resolve('test.html');
-const browser = await chromium.launch({ executablePath: process.env.FX_CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome', args: ['--autoplay-policy=document-user-activation-required'] });
+const browser = await chromium.launch({ executablePath: process.env.FX_CHROMIUM || '/opt/pw-browsers/chromium', args: ['--autoplay-policy=document-user-activation-required'] });
 const out = [];
 // A: ordinary browser. Does a tap actually put signal on the output?
 {

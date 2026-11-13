@@ -5,7 +5,7 @@ import path from 'path';
 import { startMock } from './mock-firestore.mjs';
 const url = 'file://' + path.resolve('test.html');
 const mock = await startMock();
-const browser = await chromium.launch({ executablePath: process.env.FX_CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch({ executablePath: process.env.FX_CHROMIUM || '/opt/pw-browsers/chromium' });
 const errors = [], assert = (c, m) => { if (!c) errors.push('ASSERT ' + m); }, eq = (a, b, m) => assert(a === b, `${m}: expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`);
 const DAY = '2026-10-27';
 async function device(label, width = 390) {

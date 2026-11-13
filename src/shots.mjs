@@ -1,7 +1,7 @@
 import { chromium } from 'playwright';
 import path from 'path';
 const url = 'file://' + path.resolve('test.html');
-const browser = await chromium.launch({ executablePath: process.env.FX_CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch({ executablePath: process.env.FX_CHROMIUM || '/opt/pw-browsers/chromium' });
 async function mk(w,h,scheme){ const ctx = await browser.newContext({viewport:{width:w,height:h}, deviceScaleFactor:2, colorScheme:scheme}); const p = await ctx.newPage(); p.on('pageerror',e=>console.log('pageerror '+e.message)); await p.goto(url); await p.waitForTimeout(300); return p; }
 const st = p => p.evaluate(()=>JSON.parse(JSON.stringify(window.__fx.state)));
 const pickFlag = async (p, right) => { const s = await st(p); const idx = right ? s.q.options.indexOf(s.q.a2) : s.q.options.findIndex(o=>o!==s.q.a2 && !s.q.out.includes(o)); await p.locator('#fx-panel .fx-opt').nth(idx).click(); };

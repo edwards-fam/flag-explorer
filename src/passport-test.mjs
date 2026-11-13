@@ -4,7 +4,7 @@ import path from 'path';
 import { startMock } from './mock-firestore.mjs';
 const url = 'file://' + path.resolve('test.html');
 const mock = await startMock();
-const browser = await chromium.launch({ executablePath: process.env.FX_CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch({ executablePath: process.env.FX_CHROMIUM || '/opt/pw-browsers/chromium' });
 const errors = [], assert = (c, m) => { if (!c) errors.push('ASSERT ' + m); }, eq = (a, b, m) => assert(a === b, `${m}: expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`);
 async function mk(label, { cloud = false, width = 390 } = {}) {
   const ctx = await browser.newContext({ viewport: { width, height: 844 }, deviceScaleFactor: 2 }), p = await ctx.newPage();
@@ -158,6 +158,7 @@ eq(await M2.evaluate(() => { localStorage.setItem('fx-passport', JSON.stringify(
 // a real round: the strip and the introduction on the results screen, once
 await M2.evaluate(() => localStorage.setItem('fx-passport', '{}')); await enter(M2, 'Casey'); await round(M2);
 assert((await txt(M2, '#fx-pstrip')).includes('10 new stamps') && (await txt(M2, '#fx-pp-intro')).includes('Expert passport'), 'the first round shows the strip and the introduction');
+eq(await M2.locator('#fx-log .fx-new.stamp').count(), 10, 'each new stamp is marked beside its flag');
 await M2.screenshot({ path: 'p12-strip-intro.png', fullPage: true }); await overflow(M2, 'strip');
 await M2.click('#fx-pstrip'); eq((await st(M2)).screen, 'passport', 'the strip opens the passport'); await M2.click('[data-act=back]');
 await M2.click('[data-act=choose]'); await round(M2); eq(await M2.locator('#fx-pp-intro').count(), 0, 'the introduction is shown once');
@@ -175,7 +176,8 @@ await P2.click('[data-act=rules-back]'); await enter(P2, 'Boo'); eq(await P2.loc
 // a hint-free flag with its bonus question right earns platinum; a hinted one does not
 await round(P2, { hintOn: 4 }); let sp = await st(P2);
 eq(sp.newPlat, 9, 'nine platinum stars: every flag but the hinted one'); eq((await fx(P2, 'plats', 'Boo')).length, 9, 'kept');
-assert((await txt(P2, '#fx-stamp-note')).includes('9 new platinum stars'), 'the strip counts them'); assert((await txt(P2, '#fx-pstrip')).includes('Platinum passport'), 'and is the platinum strip');
+assert((await txt(P2, '#fx-stamp-note')).includes('9 new platinum stars'), 'the strip counts them');
+eq(await P2.locator('#fx-log .fx-new.plat').count(), 9, 'and each is marked beside its flag'); eq(await P2.locator('#fx-log .fx-new.stamp').count(), 0, 'no stamp marks once the passport is full'); assert((await txt(P2, '#fx-pstrip')).includes('Platinum passport'), 'and is the platinum strip');
 await P2.screenshot({ path: 'p15-platinum-strip.png', fullPage: true });
 await P2.click('#fx-pstrip'); eq(await P2.locator('.pp-cover.gold').count(), 1, 'the Gold cover in the passport'); assert(/9\s*of 197 platinum stars/.test(await txt(P2, '.fx-band')), 'the passport counts platinum');
 await P2.click('#pp-book'); await P2.waitForTimeout(800); assert((await txt(P2, '.pp-page')).includes('Platinum stars'), 'the holder page counts platinum');

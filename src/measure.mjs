@@ -1,7 +1,7 @@
 import { chromium } from 'playwright';
 import path from 'path';
 const url = 'file://' + path.resolve('test.html');
-const browser = await chromium.launch({ executablePath: process.env.FX_CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+const browser = await chromium.launch({ executablePath: process.env.FX_CHROMIUM || '/opt/pw-browsers/chromium' });
 for (const [w,h,clock] of [[320,568,true],[360,640,true],[375,667,true],[390,700,true],[390,740,true],[390,760,false],[390,844,true],[430,932,true]]) {
   const ctx = await browser.newContext({viewport:{width:w,height:h}}); const p = await ctx.newPage(); await p.goto(url); await p.waitForTimeout(200);
   const title = await p.evaluate(()=>{ const h=document.querySelector('h1'); return {h:h.scrollWidth, band:h.clientWidth, lines: Math.round(h.getBoundingClientRect().height)}; });

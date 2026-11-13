@@ -214,6 +214,11 @@
   .fx-howbtn { display: flex; width: 100%; align-items: baseline; justify-content: space-between; gap: .75rem; padding: .35rem 0; color: var(--ink); text-align: left; cursor: pointer; }
   .fx-howbtn .fx-label { color: var(--ochre); }
   #fx-how { margin-top: .4rem; }
+  /* New passport marks beside a flag in the round's list */
+  .fx-new { display: inline-block; margin-left: .3rem; padding: .05rem .4rem; border-radius: 999px; vertical-align: .12em; white-space: nowrap;
+    font-family: var(--font-data); font-weight: 600; font-size: .6rem; letter-spacing: .06em; text-transform: uppercase; color: var(--ochre); background: var(--gold-tint); border: 1px solid var(--gold); }
+  .fx-new.plat { color: #5D6676; background: rgba(174, 181, 191, .2); border-color: #AEB5BF; }
+  .fx-new.diam { color: #1F7FB4; background: rgba(124, 199, 234, .18); border-color: #7CC7EA; }
   /* Groups */
   .fx-group { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .65rem .85rem; border: 2px solid var(--rule); border-radius: 14px; }
   .fx-group.on { border-color: var(--gold); background: var(--gold-tint); }
@@ -1381,9 +1386,10 @@
       speedPts: ok && S.clock ? speedBonus(secs) : 0, wagerPts: q.wager ? (ok ? q.wager : -q.wager) : 0 };
     S.log.push(e);
     S.score += e.pts + e.streakPts + e.speedPts + e.wagerPts;
-    if (ok && !S.practice && addStamp(q.a2)) S.newStamps++;
-    if (ok && !q.hints.length && !S.practice && addExpert(q.a2)) S.newExpert++;
-    if (ok && !q.hints.length && !S.practice && secs <= DIAMOND_SECS && addDiam(q.a2)) S.newDiam++;
+    // what this flag added to the passport, marked beside it in the round's list
+    if (ok && !S.practice && addStamp(q.a2)) { S.newStamps++; e.newStamp = true; }
+    if (ok && !q.hints.length && !S.practice && addExpert(q.a2)) { S.newExpert++; e.newStar = true; }
+    if (ok && !q.hints.length && !S.practice && secs <= DIAMOND_SECS && addDiam(q.a2)) { S.newDiam++; e.newDiam = true; }
     q.phase = 'result';
     if (!ok) { if (e.timedOut) SFX.timeout(); else SFX.wrong(); if (q.wager) SFX.wagerLose(); }
     else { SFX.right(); if (q.wager) SFX.wagerWin(); else if (e.streakPts && STREAK.some(t => t[0] === S.streak)) SFX.streak(S.streak); }
@@ -1394,7 +1400,7 @@
     if (q.phase !== 'bonus') return;
     if (bonusTimed()) addTime((Date.now() - q.t0) / 1000);
     q.bonus.pick = i;
-    if (i === q.bonus.answer) { e.bonus = 'won'; e.bonusPts = BONUS; S.score += BONUS; SFX.bonus(); if (!S.practice && !e.hints.length && addPlat(e.a2)) S.newPlat++; } else { e.bonus = 'lost'; SFX.wrong(); }
+    if (i === q.bonus.answer) { e.bonus = 'won'; e.bonusPts = BONUS; S.score += BONUS; SFX.bonus(); if (!S.practice && !e.hints.length && addPlat(e.a2)) { S.newPlat++; e.newPlat = true; } } else { e.bonus = 'lost'; SFX.wrong(); }
     q.phase = 'bonusResult';
   }
 
@@ -2059,10 +2065,13 @@
     return 'No hints · ' + (e.bonus === 'won' ? 'bonus won' : e.bonus === 'lost' ? 'bonus missed' : 'bonus open') + wager;
   }
 
+  // A flag that earned something new for the passport this round: a stamp, a gold star, a platinum star or a diamond.
+  const newMarks4 = e => [e.newStamp && ['stamp', 'New stamp'], e.newStar && ['star', 'New ★'], e.newPlat && ['plat', 'New ✦'], e.newDiam && ['diam', 'New ◆']]
+    .filter(Boolean).map(([k, label]) => ` <span class="fx-new ${k}" title="${{ stamp: 'A new stamp in your passport', star: 'A new gold star', plat: 'A new platinum star', diam: 'A new diamond' }[k]}">${label}</span>`).join('');
   const logRows = log => log.map((e, i) => `<li class="flex items-center gap-3 py-1.5 ${i ? 'border-t border-dotted border-rule' : ''}">
         <span class="fx-label w-6 flex-none">${String(i + 1).padStart(2, '0')}</span>
         <img class="fx-thumb" data-flag="${e.a2}" alt="">
-        <span class="min-w-0 flex-1 leading-tight"><span class="block font-medium ${e.ok ? '' : 'text-madder'}">${esc(C[e.a2].name)}</span><span class="block text-xs text-ink-soft">${entryNote(e)}</span></span>
+        <span class="min-w-0 flex-1 leading-tight"><span class="block font-medium ${e.ok ? '' : 'text-madder'}">${esc(C[e.a2].name)}${newMarks4(e)}</span><span class="block text-xs text-ink-soft">${entryNote(e)}</span></span>
         <span class="fx-num ${entryTotal(e) < 0 ? 'text-madder' : ''}" ${entryTotal(e) < 0 ? 'style="color:var(--madder)"' : ''}>${entryTotal(e) < 0 ? signed(entryTotal(e)) : fmt(entryTotal(e))}</span>
       </li>`).join('');
   // Everyone in a pass-and-play game, leader first. `mark` is the seat to pick out: whoever is playing, or about to.
