@@ -73,7 +73,7 @@ eq(await A.locator('#fx-cheer').count(), 0, 'the gold passport is not celebrated
 
 // ---- 2. the expert passport: one star missing, dealt, and earned
 const B = await mk('B'); const Y = POOL[100], t0 = Date.now() - 86400000;
-await seed(B, { 'fx-passport': { robin: POOL }, 'fx-expert': { robin: POOL.filter(a => a !== Y) }, 'fx-marks': { robin: { c0: t0, c1: t0, c2: t0, c3: t0, c4: t0, c5: t0, world: t0 } }, 'fx-cheered': { robin: ['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'world'] }, 'fx-people': { robin: { name: 'Robin', avatar: '🐙' } } });
+await seed(B, { 'fx-passport': { robin: POOL }, 'fx-expert': { robin: POOL.filter(a => a !== Y) }, 'fx-marks': { robin: { c0: t0, c1: t0, c2: t0, c3: t0, c4: t0, c5: t0, world: t0 } }, 'fx-cheered': { robin: ['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'world', 'lv-reverse'] }, 'fx-people': { robin: { name: 'Robin', avatar: '🐙' } } });
 await B.reload(); await B.waitForTimeout(250); await enter(B, 'Robin'); eq(JSON.stringify(await fx(B, 'stillMissing', 'Robin')), JSON.stringify([Y]), 'one expert star missing');
 await round(B); s = await st(B); assert(s.round.some(r => r.a2 === Y), 'the missing star’s flag is dealt'); eq(JSON.stringify(s.feats), '["expert"]', 'the Expert passport completes');
 eq(await B.locator('#fx-feat-expert').count(), 1, 'and is announced'); assert((await txt(B, '#fx-cheer')).includes('Gold passport!'), 'on the whole screen');
@@ -167,7 +167,7 @@ await M2.click('[data-act=choose]'); await round(M2); eq(await M2.locator('#fx-p
 // a player who finished the Expert passport before this version is told about the new level once, and sees the Expert cover
 const P2 = await mk('P2'); const tP = Date.now() - 3 * 864e5;
 await seed(P2, { 'fx-passport': { boo: POOL }, 'fx-expert': { boo: POOL }, 'fx-marks': { boo: { c0: tP, c1: tP, c2: tP, c3: tP, c4: tP, c5: tP, world: tP, expert: tP } },
-  'fx-cheered': { boo: ['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'world', 'expert'] }, 'fx-people': { boo: { name: 'Boo', avatar: '🤓' } } }); await P2.reload(); await P2.waitForTimeout(250);
+  'fx-cheered': { boo: ['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'world', 'expert', 'lv-reverse'] }, 'fx-people': { boo: { name: 'Boo', avatar: '🤓' } } }); await P2.reload(); await P2.waitForTimeout(250);
 eq(await fx(P2, 'tier', 'Boo'), 2, 'Expert complete: working on Platinum');
 await enter(P2, 'Boo'); await P2.waitForSelector('#fx-cheer'); assert((await txt(P2, '#fx-cheer')).includes('The Platinum passport') && (await txt(P2, '#fx-cheer')).includes('bonus question'), 'the new level is announced');
 eq(await P2.locator('#fx-cheer .pp-cover.gold').count(), 1, 'with the Gold cover'); assert((await txt(P2, '#fx-cheer')).includes('your passport is now Gold'), 'and says so'); await P2.waitForTimeout(600); await P2.screenshot({ path: 'p14-platinum-open.png' }); await overflow(P2, 'platinum open');
@@ -200,7 +200,7 @@ await P2.click('[data-act=end-early]'); await P2.click('[data-act=end-early]');
 // the last diamond completes every level
 const W = POOL[60];
 await seed(P2, { 'fx-diam': { boo: POOL.filter(a => a !== W) } }); await P2.click('[data-act=choose]'); await round(P2); sp = await st(P2);
-eq(JSON.stringify(sp.feats), '["diamond"]', 'the Diamond passport completes'); assert((await txt(P2, '#fx-cheer')).includes('Diamond passport!'), 'celebrated');
+eq(JSON.stringify(sp.feats), '["diamond"]', 'the Diamond passport completes'); assert((await txt(P2, '#fx-cheer')).includes('Grand Explorer!') && (await txt(P2, '#fx-cheer')).includes('the first</b> in the Hall of Fame') || (await txt(P2, '#fx-cheer')).includes('the first in the Hall of Fame'), 'celebrated as the first Grand Explorer: ' + (await txt(P2, '#fx-cheer')).slice(0, 200));
 eq(await P2.locator('#fx-cheer .pp-cover.diamond').count(), 1, 'the diamond cover'); await P2.waitForTimeout(600); await P2.screenshot({ path: 'p17-diamond-cheer.png' });
 await P2.click('[data-act=cheer-passport]'); eq(await P2.locator('.pp-cover.diamond').count(), 1, 'the passport is diamond'); assert((await txt(P2, '#pp-rule')).includes('Every level complete'), 'and says so');
 await P2.screenshot({ path: 'p18-diamond-cover.png' }); await P2.click('[data-act=back]'); await P2.click('[data-act=choose]');
@@ -214,6 +214,54 @@ eq(qdoc.perfect.filter(c => c.startsWith('p|')).length, 40, 'platinum stars reac
 const R2 = await mk('R2', { cloud: true }); await join(R2, 'levels-family'); await R2.fill('#fx-name', 'robin'); await R2.click('#fx-setup [type=submit]'); await R2.waitForSelector('#fx-claim'); await R2.click('#fx-claim [type=submit]');
 await R2.waitForFunction(() => window.__fx.state.screen === 'rules'); await R2.waitForFunction(() => !window.__fx.cloudState.busy);
 eq((await fx(R2, 'plats', 'Robin')).length, 40, 'and come down on another device');
+
+// a Grand Explorer: the crown in the header and on the boards, and the Hall of Fame
+assert((await txt(P2, '.fx-band')).includes('Grand Explorer 👑'), 'the header names a Grand Explorer');
+eq(JSON.stringify((await P2.evaluate(() => window.__fx.grandList())).map(g => g.name)), '["Boo"]', 'Boo is in the Hall of Fame');
+await P2.click('[data-act=rules-back]'); await P2.click('[data-act=board]'); await P2.click('[data-act=tab][data-v=world]');
+assert((await txt(P2, '.fx-hrow')).includes('👑'), 'the crown beside her name in the tables');
+await P2.click('[data-act=tab][data-v=wins]'); await P2.waitForSelector('#fx-hall'); assert((await txt(P2, '#fx-hall')).includes('Boo') && (await txt(P2, '#fx-hall')).includes('1st'), 'the Hall of Fame lists her first');
+await P2.screenshot({ path: 'p19-hall.png', fullPage: true }); await overflow(P2, 'hall of fame');
+
+// ---- 9. Reverse: locked until the Expert passport, then a game of its own with its own passport
+const V = await mk('V'); await seed(V, { 'fx-passport': { casey: POOL.slice(0, 150) }, 'fx-people': { casey: { name: 'Casey', avatar: '🦊' } } }); await V.reload(); await V.waitForTimeout(250);
+await enter(V, 'Casey'); eq(await V.locator('#fx-mode-locked').count(), 1, 'Reverse shows as locked'); assert((await txt(V, '#fx-mode-locked')).includes('47 stamps to go'), 'with the stamps still needed');
+eq(await V.locator('#fx-mode-reverse').count(), 0, 'and cannot be chosen'); await V.screenshot({ path: 'p20-reverse-locked.png', fullPage: true });
+const W2 = await mk('W2'); const tE = Date.now() - 864e5;
+await seed(W2, { 'fx-passport': { robin: POOL }, 'fx-expert': { robin: POOL.slice(0, 20) }, 'fx-marks': { robin: { c0: tE, c1: tE, c2: tE, c3: tE, c4: tE, c5: tE, world: tE } }, 'fx-cheered': { robin: ['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'world'] }, 'fx-people': { robin: { name: 'Robin', avatar: '🐙' } } });
+await W2.reload(); await W2.waitForTimeout(250); await enter(W2, 'Robin'); await W2.waitForSelector('#fx-cheer');
+assert((await txt(W2, '#fx-cheer')).includes('New: Reverse'), 'a player who already had the Expert passport is told Reverse is open'); eq(await W2.locator('#fx-cheer .pp-cover.reverse').count(), 1, 'with the Reverse cover');
+await W2.waitForTimeout(600); await W2.screenshot({ path: 'p21-reverse-open.png' }); await W2.click('[data-act=cheer-close]');
+eq(await W2.locator('#fx-mode-reverse').count(), 1, 'Reverse can be chosen'); await W2.click('#fx-mode-reverse');
+eq(await W2.locator('#fx-pool-l').count(), 0, 'no flag set or clock to choose'); await W2.click('[data-act=play]');
+let rs = await st(W2); eq(rs.reverse, true, 'a Reverse round'); eq(rs.table, 'reverse', 'kept apart from the high-score tables');
+const qn = C2 => C2; const nm = await W2.evaluate(() => { const s = window.__fx.state; return window.__fx.C[s.q.a2].name; });
+assert((await txt(W2, '.fx-revname')).includes(nm), 'the country is named'); eq(await W2.locator('.fx-plate.rev-ask .fx-flag').isVisible(), false, 'and its flag is hidden');
+eq(await W2.locator('#fx-panel .fx-optflag img').count(), 4, 'four flags to choose from'); eq(await W2.locator('#fx-panel .fx-hint').count(), 1, 'only the 50/50 hint');
+const opts = await W2.locator('#fx-panel .fx-optflag').allTextContents(); assert(!opts.some(t => t.includes(nm)), 'the answers do not name their countries');
+await W2.screenshot({ path: 'p22-reverse-play.png' }); await overflow(W2, 'reverse play');
+await pickFlag(W2, true); assert((await txt(W2, '#fx-panel')).includes(nm), 'after answering, the flags are named'); eq(await W2.locator('.fx-plate.rev-ask').count(), 0, 'and the flag is shown');
+await W2.screenshot({ path: 'p23-reverse-result.png' });
+const before2 = { stamps: (await fx(W2, 'stamps', 'Robin')).length, stars: (await fx(W2, 'experts', 'Robin')).length };
+await W2.click('[data-act=bonus]'); await pickBonus(W2, true); await W2.click('[data-act=next]');
+for (let k = 2; k <= 10; k++) { if ((await st(W2)).q.phase === 'wager') await W2.click('[data-act=wager][data-v="0"]'); await pickFlag(W2, true); await W2.click('[data-act=bonus]'); await pickBonus(W2, true); await W2.click('[data-act=next]'); }
+await W2.waitForTimeout(200); rs = await st(W2);
+eq(rs.newRev, 10, 'ten reverse stamps'); eq((await fx(W2, 'revs', 'Robin')).length, 10, 'kept'); eq((await fx(W2, 'experts', 'Robin')).length, before2.stars, 'no gold stars from a Reverse round');
+assert((await txt(W2, '#fx-pstrip')).includes('10 new reverse stamps') && (await txt(W2, '#fx-pstrip')).includes('Reverse passport'), 'the strip counts reverse stamps');
+eq(await W2.locator('#fx-log .fx-new.rev').count(), 10, 'each marked beside its flag'); await W2.screenshot({ path: 'p24-reverse-end.png', fullPage: true });
+await W2.click('#fx-pstrip'); eq(await W2.locator('.pp-cover.reverse').count(), 1, 'the strip opens the Reverse passport'); assert(/10\s*of 197 found/.test(await txt(W2, '.fx-band')), 'counting what was found');
+await W2.click('[data-act=ppbook][data-v=world]'); eq(await W2.locator('.pp-cover.expert').count(), 1, 'and switches to the main passport'); await W2.click('[data-act=back]');
+await W2.click('[data-act=again]'); eq((await st(W2)).reverse, true, 'Play again stays in Reverse');
+// the last reverse stamp completes it
+await W2.click('[data-act=end-early]'); await W2.click('[data-act=end-early]'); const last = POOL[42];
+await seed(W2, { 'fx-rev': { robin: POOL.filter(a => a !== last) } }); await W2.click('[data-act=choose]'); await W2.click('#fx-mode-reverse'); await W2.click('[data-act=play]');
+for (let k = 1; k <= 10; k++) { if ((await st(W2)).q.phase === 'wager') await W2.click('[data-act=wager][data-v="0"]'); await pickFlag(W2, true); await W2.click('[data-act=bonus]'); await pickBonus(W2, true); await W2.click('[data-act=next]'); }
+await W2.waitForTimeout(200); rs = await st(W2); assert(rs.round.some(r => r.a2 === last), 'the last missing flag is dealt'); eq(JSON.stringify(rs.feats), '["reverse"]', 'the Reverse passport completes');
+assert((await txt(W2, '#fx-cheer')).includes('Reverse passport!'), 'and is celebrated'); await W2.waitForTimeout(600); await W2.screenshot({ path: 'p25-reverse-done.png' });
+// reverse stamps travel with the player through the family
+const X2 = await mk('X2', { cloud: true }); await seed(X2, { 'fx-passport': { morgan: POOL }, 'fx-rev': { morgan: POOL.slice(0, 33) }, 'fx-cheered': { morgan: ['lv-reverse', 'world'] }, 'fx-people': { morgan: { name: 'Morgan', avatar: '🐢' } } });
+await X2.reload(); await X2.waitForTimeout(250); await join(X2, 'reverse-family'); await enter(X2, 'Morgan'); await X2.evaluate(() => window.__fx.cloudSync()); await X2.waitForFunction(() => !window.__fx.cloudState.busy);
+const xfid = (await X2.evaluate(() => window.__fx.family())).fid; eq(mock.plain(mock.docs.get(`families/${xfid}/players/morgan`)).perfect.filter(c => c.startsWith('r|')).length, 33, 'reverse stamps reach the family');
 
 await browser.close(); mock.close();
 console.log(errors.length ? errors.join('\n') : 'PASSPORT CHECKS PASSED');

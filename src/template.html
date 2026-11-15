@@ -219,6 +219,25 @@
     font-family: var(--font-data); font-weight: 600; font-size: .6rem; letter-spacing: .06em; text-transform: uppercase; color: var(--ochre); background: var(--gold-tint); border: 1px solid var(--gold); }
   .fx-new.plat { color: #5D6676; background: rgba(174, 181, 191, .2); border-color: #AEB5BF; }
   .fx-new.diam { color: #1F7FB4; background: rgba(124, 199, 234, .18); border-color: #7CC7EA; }
+  /* Reverse rounds: the country's name in place of the flag, and flags as answers */
+  .fx-revname { display: none; position: absolute; inset: 0; flex-direction: column; align-items: center; justify-content: center; gap: .35rem; padding: .75rem; text-align: center; }
+  .fx-revname b { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.8rem, 8vw, 2.6rem); line-height: 1.05; letter-spacing: .02em; text-transform: uppercase; color: var(--ink); }
+  .fx-plate.rev-ask .fx-revname { display: flex; }
+  .fx-plate.rev-ask .fx-flag { visibility: hidden; }
+  .fx-optflag { align-items: center; }
+  .fx-optimg { display: flex; flex-direction: column; align-items: center; gap: .25rem; min-width: 0; flex: 1; }
+  .fx-optimg img { width: 100%; max-width: 7.5rem; height: 3.6rem; object-fit: contain; border-radius: 4px; }
+  .fx-optimg small { font-size: .78rem; line-height: 1.15; text-align: center; }
+  .fx-locked { opacity: .78; cursor: default; border-style: dashed; }
+  .fx-locked::before { visibility: hidden; }
+  .fx-new.rev { color: #1E7A71; background: rgba(44, 154, 143, .14); border-color: #2C9A8F; }
+  .fx-pstrip.rev { border-color: #2C9A8F; background: rgba(44, 154, 143, .1); }
+  .fx-pstrip.rev .fx-meter i { background: #2C9A8F; }
+  .fx-hall { padding: .7rem .9rem; border: 2px solid var(--gold); border-radius: 14px; background: var(--gold-tint); }
+  /* The Reverse passport: deep teal, mirrored */
+  .pp-cover.reverse { --pp-navy: #0F4A47; color: #E9D8A6; background: radial-gradient(120% 90% at 70% 15%, rgba(255, 255, 255, .12), transparent 60%), linear-gradient(270deg, rgba(0, 0, 0, .4) 0, transparent 6%), linear-gradient(200deg, #1A6B66, #0B3936); }
+  .pp-cover.reverse .pp-emblem { transform: scaleX(-1); }
+  .pp-cover.reverse.done { box-shadow: inset 0 0 0 5px #0F4A47, inset 0 0 0 6.5px #E9D8A6; }
   /* Groups */
   .fx-group { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .65rem .85rem; border: 2px solid var(--rule); border-radius: 14px; }
   .fx-group.on { border-color: var(--gold); background: var(--gold-tint); }
@@ -758,7 +777,7 @@
   }
   // Starting fresh: everything this device has recorded about play (scores, today's result, personal bests, passports and
   // gold stamps). Settings stay. Offered only while the device is outside a family, because shared scores cannot be taken back.
-  const RECORDS = ['fx-tables', 'fx-bests', 'fx-perfect', 'fx-passport', 'fx-days', 'fx-expert', 'fx-plat', 'fx-diam', 'fx-marks', 'fx-cheered'];
+  const RECORDS = ['fx-tables', 'fx-bests', 'fx-perfect', 'fx-passport', 'fx-days', 'fx-expert', 'fx-plat', 'fx-diam', 'fx-rev', 'fx-marks', 'fx-cheered'];
   const anyRecords = () => dailyData().rows.length > 0 || RECORDS.some(k => Object.values(store.get(k, {}) || {}).some(v => v && (v.length || v.score)));
   function wipeRecords() {
     [...RECORDS, 'fx-people'].forEach(k => store.set(k, {}));
@@ -889,8 +908,14 @@
     return true;
   }
   const addPlat = a2 => addLevel('fx-plat', a2, 2), addDiam = a2 => addLevel('fx-diam', a2, 3);
+  /* The Reverse passport: see a country's name, pick its flag from four look-alikes. A game of its own, unlocked by the
+     Expert passport (every country stamped), with its own 197 stamps. Its rounds earn nothing in the main passport. */
+  const revs = name => store.get('fx-rev', {})[plain(name)] || [];
+  const revOpen = name => passportDone(name);
+  function addRev(a2) { if (!revOpen(P.name)) return false; const all = store.get('fx-rev', {}), k = plain(P.name), list = all[k] || []; if (list.includes(a2)) return false; all[k] = [...list, a2]; store.set('fx-rev', all); return true; }
+  const REV = { key: 'reverse', list: revs, one: 'reverse stamp', many: 'reverse stamps', goal: 'the Reverse passport', title: 'Reverse passport', label: '🔄 Reverse passport', link: '' };
   // Milestones reached, each kept with the moment it was reached: 'c0' to 'c5' for the continents, 'world', 'expert', 'platinum', 'diamond'.
-  const FINISHES = ['world', 'expert', 'platinum', 'diamond'];
+  const FINISHES = ['world', 'expert', 'platinum', 'diamond', 'reverse'];
   const headline = keys => keys.some(k => FINISHES.includes(k)) ? keys.filter(k => k[0] !== 'c') : keys;
   const featName = key => key === 'world' ? 'the Expert passport' : key === 'expert' ? 'the Gold passport' : FINISHES.includes(key) ? `the ${key[0].toUpperCase() + key.slice(1)} passport` : CONTS[+key.slice(1)];
   const marks = name => store.get('fx-marks', {})[plain(name)] || {};
@@ -901,6 +926,7 @@
     if (POOL.every(a => ex.has(a))) out.push('expert');
     if (allIn(plats(name))) out.push('platinum');
     if (allIn(diams(name))) out.push('diamond');
+    if (allIn(revs(name))) out.push('reverse');
     return out;
   }
   function newMarks(name, t = Date.now()) {
@@ -912,7 +938,7 @@
      sync that brought two devices' stamps together, or in a game closed before its results) is owed, and is celebrated the
      next time that player chooses a game here. */
   const cheered = name => (store.get('fx-cheered', {}) || {})[plain(name)] || [];
-  const NEXT_OPEN = { expert: 'lv-platinum', platinum: 'lv-diamond' };
+  const NEXT_OPEN = { world: 'lv-reverse', expert: 'lv-platinum', platinum: 'lv-diamond' };
   function cheer(name, keys) { if (!keys.length) return; keys = [...keys, ...keys.map(k => NEXT_OPEN[k]).filter(Boolean)]; const all = store.get('fx-cheered', {}) || {}, k = plain(name); all[k] = [...new Set([...(all[k] || []), ...keys])]; store.set('fx-cheered', all); }
   const owed = name => { const seen = cheered(name); return Object.keys(marks(name)).filter(k => !seen.includes(k)); };
   // The first time this version runs on a device, continents already reached count as celebrated; a full or Expert passport
@@ -1081,7 +1107,7 @@
     if (more.length) { golds[key] = [...mine, ...more].sort((a, b) => a.t - b.t); store.set('fx-perfect', golds); }
     const codes = texts(d.perfect), exAll = store.get('fx-expert', {}), exMine = exAll[key] || [], exMore = codes.filter(c => c.startsWith('x|')).map(c => c.slice(2)).filter(a => C[a] && !exMine.includes(a));
     if (exMore.length) { exAll[key] = [...exMine, ...exMore]; store.set('fx-expert', exAll); }
-    for (const [tag, skey] of [['p', 'fx-plat'], ['d', 'fx-diam']]) {        // platinum marks as 'p|code', diamonds as 'd|code'
+    for (const [tag, skey] of [['p', 'fx-plat'], ['d', 'fx-diam'], ['r', 'fx-rev']]) {        // platinum marks as 'p|code', diamonds as 'd|code'
       const lvAll = store.get(skey, {}), lvMine = lvAll[key] || [], lvMore = codes.filter(c => c.startsWith(tag + '|')).map(c => c.slice(2)).filter(a => C[a] && !lvMine.includes(a));
       if (lvMore.length) { lvAll[key] = [...lvMine, ...lvMore]; store.set(skey, lvAll); }
     }
@@ -1101,7 +1127,7 @@
     if (doc && d.avatar && d.avatar !== who.avatar && (last === undefined ? !playedHere : last === who.avatar)) setFace(who, d.avatar);
     // up: only if this device holds something the family's copy does not
     const want = { name: typeof d.name === 'string' && d.name ? d.name : who.name, avatar: who.avatar || '' };
-    const allStamps = [...new Set([...texts(d.stamps), ...stamps(who.name).filter(a => C[a])])].slice(0, 250), allGold = [...new Set([...texts(d.perfect), ...perfects(who.name).map(goldCode), ...experts(who.name).map(a => 'x|' + a), ...plats(who.name).map(a => 'p|' + a), ...diams(who.name).map(a => 'd|' + a), ...Object.entries(marks(who.name)).map(([k, t]) => `m|${k}|${t}`)])].slice(-3000);
+    const allStamps = [...new Set([...texts(d.stamps), ...stamps(who.name).filter(a => C[a])])].slice(0, 250), allGold = [...new Set([...texts(d.perfect), ...perfects(who.name).map(goldCode), ...experts(who.name).map(a => 'x|' + a), ...plats(who.name).map(a => 'p|' + a), ...diams(who.name).map(a => 'd|' + a), ...revs(who.name).map(a => 'r|' + a), ...Object.entries(marks(who.name)).map(([k, t]) => `m|${k}|${t}`)])].slice(-3000);
     if (allStamps.length) want.stamps = allStamps;
     if (allGold.length) want.perfect = allGold;
     const nums = [];
@@ -1228,7 +1254,7 @@
     tidyParty();
     S.screen = 'rules';
   }
-  const modeLabel = () => S.mode === 'daily' ? `Today's challenge` : `${S.party ? 'Pass and play · ' : ''}${POOLS[S.table].label}${S.clock ? ' · clock' : ''}`;
+  const modeLabel = () => S.mode === 'daily' ? `Today's challenge` : S.reverse ? 'Reverse' : `${S.party ? 'Pass and play · ' : ''}${POOLS[S.table].label}${S.clock ? ' · clock' : ''}`;
 
   /* ---------- A round ---------- */
   // Everything about a round is decided up front, which is what lets the daily challenge be identical for everyone.
@@ -1268,6 +1294,12 @@
       // Seeded by the date: five well-known flags and five from the rest of the world.
       rand = seeded(hashStr('flag-explorer ' + todayKey()));
       codes = shuffle([...shuffle(POOLS.known.codes).slice(0, 5), ...shuffle(POOL.filter(a => !KNOWN.has(a))).slice(0, 5)]);
+    } else if (O.mode === 'reverse') {
+      // Reverse: the whole world; near the end, missing reverse stamps are dealt more often
+      const have = new Set(revs(P.name)), missing = POOL.filter(a => !have.has(a));
+      const lean = missing.length && missing.length <= LAST_STRETCH ? shuffle(missing).slice(0, LEAN) : [];
+      codes = shuffle([...lean, ...deck(POOL.filter(a => !lean.includes(a)), ROUND).slice(0, ROUND - lean.length)]);
+      markSeen(codes);
     } else {
       const pool = POOLS[O.pool].codes, missing = stillMissing(P.name);
       const lean = missing.length && missing.length <= LAST_STRETCH ? shuffle(missing.filter(a => pool.includes(a))).slice(0, LEAN) : [];
@@ -1277,15 +1309,16 @@
     const round = buildRound(codes);
     rand = Math.random;
     M = null;
-    S = roundState(round, P.name, { mode: daily ? 'daily' : 'free', table: daily ? 'daily' : O.pool, clock: !daily && !!O.clock, practice: daily && !!playedToday(P.name),
-      limit: daily ? (dayTimed() ? DAY_CLOCK : 0) : O.clock ? CLOCK : 0 });
+    const reverse = O.mode === 'reverse';
+    S = roundState(round, P.name, { mode: daily ? 'daily' : 'free', table: daily ? 'daily' : reverse ? 'reverse' : O.pool, clock: !daily && !reverse && !!O.clock, practice: daily && !!playedToday(P.name),
+      limit: daily ? (dayTimed() ? DAY_CLOCK : 0) : !reverse && O.clock ? CLOCK : 0, reverse, left0: reverse ? POOL.length - revs(P.name).filter(a => C[a]).length : stillMissing(P.name).length });
     startQuestion();
   }
   // One player's round. A player new to this device gets a single tip on their first flag.
   function roundState(round, name, more) {
     // limit: seconds allowed for each answer (0 for no clock). ms: the time taken over the round's timed answers.
     return Object.assign({ screen: 'play', mode: 'free', table: O.pool, clock: !!O.clock, limit: O.clock ? CLOCK : 0, ms: 0, practice: false, round, i: 0, score: 0, streak: 0, topStreak: 0, log: [], q: null,
-      confirmEnd: false, newBest: false, newStamps: 0, newExpert: 0, newPlat: 0, newDiam: 0, feats: [], place: 0, entryT: 0, perfect: false, tip: !store.get('fx-tipped', []).includes(plain(name)),
+      confirmEnd: false, newBest: false, newStamps: 0, newExpert: 0, newPlat: 0, newDiam: 0, newRev: 0, reverse: false, feats: [], place: 0, entryT: 0, perfect: false, tip: !store.get('fx-tipped', []).includes(plain(name)),
       left0: stillMissing(name).length, lv0: tier(name), intro: false }, more);       // how far from the next finish line the round began
   }
 
@@ -1387,9 +1420,12 @@
     S.log.push(e);
     S.score += e.pts + e.streakPts + e.speedPts + e.wagerPts;
     // what this flag added to the passport, marked beside it in the round's list
-    if (ok && !S.practice && addStamp(q.a2)) { S.newStamps++; e.newStamp = true; }
-    if (ok && !q.hints.length && !S.practice && addExpert(q.a2)) { S.newExpert++; e.newStar = true; }
-    if (ok && !q.hints.length && !S.practice && secs <= DIAMOND_SECS && addDiam(q.a2)) { S.newDiam++; e.newDiam = true; }
+    if (S.reverse) { if (ok && !S.practice && addRev(q.a2)) { S.newRev++; e.newRev = true; } }      // Reverse rounds fill the Reverse passport only
+    else {
+      if (ok && !S.practice && addStamp(q.a2)) { S.newStamps++; e.newStamp = true; }
+      if (ok && !q.hints.length && !S.practice && addExpert(q.a2)) { S.newExpert++; e.newStar = true; }
+      if (ok && !q.hints.length && !S.practice && secs <= DIAMOND_SECS && addDiam(q.a2)) { S.newDiam++; e.newDiam = true; }
+    }
     q.phase = 'result';
     if (!ok) { if (e.timedOut) SFX.timeout(); else SFX.wrong(); if (q.wager) SFX.wagerLose(); }
     else { SFX.right(); if (q.wager) SFX.wagerWin(); else if (e.streakPts && STREAK.some(t => t[0] === S.streak)) SFX.streak(S.streak); }
@@ -1400,7 +1436,7 @@
     if (q.phase !== 'bonus') return;
     if (bonusTimed()) addTime((Date.now() - q.t0) / 1000);
     q.bonus.pick = i;
-    if (i === q.bonus.answer) { e.bonus = 'won'; e.bonusPts = BONUS; S.score += BONUS; SFX.bonus(); if (!S.practice && !e.hints.length && addPlat(e.a2)) { S.newPlat++; e.newPlat = true; } } else { e.bonus = 'lost'; SFX.wrong(); }
+    if (i === q.bonus.answer) { e.bonus = 'won'; e.bonusPts = BONUS; S.score += BONUS; SFX.bonus(); if (!S.practice && !S.reverse && !e.hints.length && addPlat(e.a2)) { S.newPlat++; e.newPlat = true; } } else { e.bonus = 'lost'; SFX.wrong(); }
     q.phase = 'bonusResult';
   }
 
@@ -1502,7 +1538,7 @@
   const playerHead = () => `<div class="fx-band flex items-center gap-3.5">
         <span class="fx-ava" style="--s:3.5rem" aria-hidden="true">${esc(P.avatar)}</span>
         <div class="min-w-0 flex-1">
-          <div class="flex items-baseline justify-between gap-3"><p class="fx-label">Explorer</p>${muteBtn()}</div>
+          <div class="flex items-baseline justify-between gap-3"><p class="fx-label">${crown(P.name) ? 'Grand Explorer 👑' : 'Explorer'}</p>${muteBtn()}</div>
           <h1 class="fx-h text-4xl fx-clip whitespace-nowrap">${esc(P.name)}</h1>
         </div>
       </div>`;
@@ -1591,7 +1627,8 @@
 
   // Screen 2: choose the game, see how points work, then into the round
   function viewRules() {
-    const played = playedToday(P.name), daily = O.mode === 'daily', party = O.mode === 'party', clock = !daily && O.clock;
+    if (O.mode === 'reverse' && !revOpen(P.name)) O.mode = 'free';
+    const played = playedToday(P.name), daily = O.mode === 'daily', party = O.mode === 'party', reverse = O.mode === 'reverse', clock = !daily && !reverse && O.clock;
     const seat = (g, i) => `<li class="fx-seat">
         <button type="button" class="fx-ava" style="--s:2.6rem" data-act="guest-ava" data-i="${i}" aria-label="Change player ${i + 2}'s picture">${esc(g.avatar)}</button>
         <input class="fx-input fx-guest" data-i="${i}" type="text" maxlength="14" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="done" placeholder="Player ${i + 2} name" aria-label="Player ${i + 2} name" value="${esc(g.name)}">
@@ -1623,9 +1660,16 @@
           <span><b>Pass and play</b></span>
           <small>Two to eight players take turns on this device, one flag at a time.</small>
         </button>
+        ${revOpen(P.name) ? `<button type="button" class="fx-mode" data-act="opt" data-k="mode" data-v="reverse" aria-pressed="${O.mode === 'reverse'}" id="fx-mode-reverse">
+          <span class="flex items-baseline justify-between gap-3"><b>🔄 Reverse</b><span class="fx-label">${revs(P.name).filter(a => C[a]).length} of ${POOL.length}</span></span>
+          <small>See a country's name and pick its flag from four look-alikes. Fills your Reverse passport.</small>
+        </button>` : `<div class="fx-mode fx-locked" id="fx-mode-locked" aria-disabled="true">
+          <span class="flex items-baseline justify-between gap-3"><b>🔒 Reverse</b><span class="fx-label">${POOL.length - stamps(P.name).filter(a => C[a]).length} stamps to go</span></span>
+          <small>A new way to play: see a country's name, pick its flag. Unlocks with the Expert passport, when all ${POOL.length} countries are stamped.</small>
+        </div>`}
       </div>
       ${players}
-      ${daily ? '' : `<div class="grid gap-3 ${party ? '' : 'mt-4'}">
+      ${daily || reverse ? '' : `<div class="grid gap-3 ${party ? '' : 'mt-4'}">
         ${party ? `<div><p class="fx-label" id="fx-each-l">Length</p><div class="grid grid-cols-2 gap-2 mt-1" role="group" aria-labelledby="fx-each-l">${pick('each', '5', '5 flags each')}<button type="button" class="fx-pick" data-act="opt" data-k="each" data-v="${ROUND}" aria-pressed="${O.each === ROUND}" ${canLong() ? '' : 'disabled style="opacity:.45"'}>${ROUND} flags each</button></div>
           ${canLong() ? '' : `<p class="text-sm text-ink-soft mt-1.5" id="fx-each-note">${O.guests.length + 1} players at ${ROUND} flags each need more flags than the well-known set holds. Choose Whole world for the longer game.</p>`}</div>` : ''}
         <div><p class="fx-label" id="fx-pool-l">Flags</p><div class="grid grid-cols-2 gap-2 mt-1" role="group" aria-labelledby="fx-pool-l">${pick('pool', 'known', `Well-known · ${POOLS.known.codes.length}`)}${pick('pool', 'world', `Whole world · ${POOL.length}`)}</div></div>
@@ -1675,20 +1719,32 @@
     }
     return out.sort((a, b) => a.t - b.t);
   }
+  /* Grand Explorers: players who have completed every level, up to the Diamond passport, with the moment each did. */
+  function grandList() {
+    const f = family(), cache = f && store.get(gkey('fx-cloud-people', f.fid), null), out = new Map(), names = store.get('fx-people', {});
+    if (cache && cache.fid === f.fid) for (const p of cache.list || []) if (p.marks && p.marks.diamond) out.set(pidOf(p.name), { name: p.name, avatar: p.avatar, t: p.marks.diamond });
+    for (const [k, m] of Object.entries(store.get('fx-marks', {}) || {})) if (m && m.diamond) {
+      const name = (names[k] && names[k].name) || k, id = pidOf(name), had = out.get(id);
+      if (!had || m.diamond < had.t) out.set(id, { name: had ? had.name : name, avatar: had ? had.avatar : (names[k] && names[k].avatar) || '', t: had ? Math.min(had.t, m.diamond) : m.diamond });
+    }
+    return [...out.values()].sort((a, b) => a.t - b.t);
+  }
+  const crown = name => grandList().some(g => pidOf(g.name) === pidOf(name)) ? ' 👑' : '';
   const featLine = x => x.key === 'world' ? `🌍 ${x.name} stamped every country and earned the Expert passport!` : x.key === 'expert' ? `🥇 ${x.name} completed the Gold passport!`
-    : x.key === 'platinum' ? `✦ ${x.name} completed the Platinum passport!` : x.key === 'diamond' ? `💎 ${x.name} completed the Diamond passport!` : `🗺️ ${x.name} completed ${CONTS[+x.key.slice(1)]}!`;
+    : x.key === 'platinum' ? `✦ ${x.name} completed the Platinum passport!` : x.key === 'diamond' ? `💎👑 ${x.name} completed the Diamond passport and is now a Grand Explorer!`
+    : x.key === 'reverse' ? `🔄 ${x.name} completed the Reverse passport!` : `🗺️ ${x.name} completed ${CONTS[+x.key.slice(1)]}!`;
   function dayText(date, book = daysBook()) {
     const rows = [...(book.get(date) || [])].sort(byScore), won = dayWinners(rows);
     if (!rows.length) return `🌍 Flag Explorer · ${many() ? family().name : `Today's challenge`}\n${dayLabel(date)}\n\nNo scores for this day.`;
     let place = 0;
-    const lines = rows.map((r, i) => { if (!i || r.score !== rows[i - 1].score || timeOf(r) !== timeOf(rows[i - 1])) place = i + 1; return `${MEDALS[place - 1] || place + '.'} ${r.avatar} ${r.name} ${fmt(r.score)}${Number.isInteger(r.ms) ? ` · ${timeText(r.ms)}` : ''}`; });
+    const lines = rows.map((r, i) => { if (!i || r.score !== rows[i - 1].score || timeOf(r) !== timeOf(rows[i - 1])) place = i + 1; return `${MEDALS[place - 1] || place + '.'} ${r.avatar} ${r.name}${crown(r.name)} ${fmt(r.score)}${Number.isInteger(r.ms) ? ` · ${timeText(r.ms)}` : ''}`; });
     const names = won.map(r => r.name), month = date.slice(0, 7), monthName = MONTH_NAMES[+month.slice(5) - 1];
     const level = rows.filter(r => r.score === won[0].score).length > won.length;          // someone matched the winning score but was slower
     const head = won.length > 1 ? `🏆 ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]} tie for the win with ${fmt(won[0].score)}!`
       : `🏆 ${names[0]} wins with ${fmt(won[0].score)}${Number.isInteger(won[0].ms) ? ` in ${timeText(won[0].ms)}` : ''}!${level ? ' The tie went to the faster time.' : ''}`;
     const sofar = book.size ? [...book.keys()].filter(k => k.startsWith(month) && k <= date) : [];
     const upTo = new Map([...book].filter(([k]) => k <= date)), pts = winsTable(month, upTo, 'points');      // streaks may run in from the month before
-    const board = pts.slice(0, 10).map(e => `${e.place}. ${e.avatar} ${e.name} ${fmt(e.points)}${e.bonus ? ` (incl. +${fmt(e.bonus)} bonus)` : ''}`);
+    const board = pts.slice(0, 10).map(e => `${e.place}. ${e.avatar} ${e.name}${crown(e.name)} ${fmt(e.points)}${e.bonus ? ` (incl. +${fmt(e.bonus)} bonus)` : ''}`);
     if (pts.length > 10) board.push(`…and ${plural(pts.length - 10, 'more player')}`);
     const monthOver = todayKey().slice(0, 7) > month, lastHere = sofar[sofar.length - 1] === date && ![...book.keys()].some(k => k.startsWith(month) && k > date);
     const span = monthOver && lastHere ? ', final' : !monthOver && lastHere ? ' so far' : ` up to ${dayLabel(date).replace(/^[A-Za-z]+ /, '')}`;
@@ -1701,6 +1757,13 @@
       ...(link ? ['', `Play today's flags: ${link}`] : [])].join('\n');
   }
 
+  // Everyone who has completed the Diamond passport, first first.
+  function hallOfFame() {
+    const hall = grandList(); if (!hall.length) return '';
+    return `<div class="fx-hall mt-6" id="fx-hall"><p class="fx-label">👑 Hall of Fame · Grand Explorers</p>
+      <ol class="mt-1">${hall.map((g, i) => { const d = new Date(g.t); return `<li class="flex items-center gap-2 py-1"><span class="fx-hrank" style="width:2.2rem">${ordinal(i + 1)}</span><span aria-hidden="true">${esc(g.avatar || '')}</span><b class="font-medium fx-clip whitespace-nowrap min-w-0 flex-1">${esc(g.name)}</b><span class="fx-label">${d.getDate()} ${MONTH_NAMES[d.getMonth()].slice(0, 3)} ${d.getFullYear()}</span></li>`; }).join('')}</ol>
+      <p class="text-sm text-ink-soft mt-1">Complete all four passport levels, Expert, Gold, Platinum and Diamond, to join them.</p></div>`;
+  }
   // The daily wins: who has won Today's challenge most often, this month and since the start
   const nameList = list => { const n = list.map(e => esc(e.name)); return n.length < 3 ? n.join(' and ') : n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1]; };
   function viewWins() {
@@ -1710,7 +1773,7 @@
     const rows = (list.length ? list.slice(0, 30) : [null, null, null]).map((e, i) => `<li class="fx-hrow ${e ? '' : 'empty'} ${e && e.place === 1 ? 'top' : ''}">
         <span class="fx-hrank">${e ? ordinal(e.place) : ORD[i]}</span>
         <span class="fx-ava ${e ? '' : 'blank'}" style="--s:2.1rem" aria-hidden="true">${e ? esc(e.avatar) : ''}</span>
-        <span class="min-w-0"><span class="flex items-center gap-1.5 min-w-0"><span class="fx-clip whitespace-nowrap min-w-0 ${e ? 'font-medium' : ''}">${e ? esc(e.name) : '· · ·'}</span>${e && e.streak ? `<span class="fx-streak flex-none" title="${e.streak} wins in a row">🔥${e.streak}</span>` : ''}</span>${e ? `<span class="fx-label block" style="margin-top:.1rem">${plural(e.played, 'day')} · <span class="whitespace-nowrap">${byPoints ? plural(e.wins, 'win') : fmt(e.points) + ' pts'}</span>${byPoints && e.bonus ? ` · <span class="whitespace-nowrap">+${fmt(e.bonus)} bonus</span>` : ''}</span>` : ''}</span>
+        <span class="min-w-0"><span class="flex items-center gap-1.5 min-w-0"><span class="fx-clip whitespace-nowrap min-w-0 ${e ? 'font-medium' : ''}">${e ? esc(e.name) : '· · ·'}</span>${e && crown(e.name) ? '<span class="flex-none" title="Grand Explorer">👑</span>' : ''}${e && e.streak ? `<span class="fx-streak flex-none" title="${e.streak} wins in a row">🔥${e.streak}</span>` : ''}</span>${e ? `<span class="fx-label block" style="margin-top:.1rem">${plural(e.played, 'day')} · <span class="whitespace-nowrap">${byPoints ? plural(e.wins, 'win') : fmt(e.points) + ' pts'}</span>${byPoints && e.bonus ? ` · <span class="whitespace-nowrap">+${fmt(e.bonus)} bonus</span>` : ''}</span>` : ''}</span>
         <span class="fx-num text-lg">${e ? fmt(byPoints ? e.points : e.wins) : ''}</span>
       </li>`).join('');
     const foot = !list.length ? (all ? 'No finished days yet.' : `No finished days in ${monthName} yet.`)
@@ -1738,6 +1801,7 @@
       <p class="font-script text-lg text-center mt-4" id="fx-wins-foot">${foot}</p>
       ${lastMonth ? `<p class="text-sm text-center mt-1" id="fx-wins-last">${lastMonth}</p>` : ''}
       ${recent ? `<p class="fx-label mt-6">Recent winners</p><ul class="mt-1" id="fx-days">${recent}</ul>` : ''}
+      ${hallOfFame()}
       ${share}
       ${family() ? `<p class="text-sm text-ink-soft text-center mt-4" id="fx-cloud-note" role="status">${cloudNote()}</p>` : ''}
       <p class="text-sm text-ink-soft text-center mt-2" id="fx-wins-key">${byPoints
@@ -1756,7 +1820,7 @@
       return `<li class="fx-hrow ${r ? '' : 'empty'} ${r && i === 0 ? 'top' : ''} ${i === mine || (r && fresh.includes(r.t)) ? 'hot' : ''}">
         <span class="fx-hrank">${o}</span>
         <span class="fx-ava ${r ? '' : 'blank'}" style="--s:2.1rem" aria-hidden="true">${r ? esc(r.avatar) : ''}</span>
-        <span class="flex items-center gap-2 min-w-0"><span class="fx-clip whitespace-nowrap min-w-0 ${r ? 'font-medium' : ''}">${r ? esc(r.name) : '· · ·'}</span>${r && r.perfect ? STAR : ''}${r && r.clock ? '<span class="fx-label flex-none">clock</span>' : ''}${r && tab === 'daily' && Number.isInteger(r.ms) ? `<span class="fx-label flex-none fx-rtime">${timeText(r.ms)}</span>` : ''}</span>
+        <span class="flex items-center gap-2 min-w-0"><span class="fx-clip whitespace-nowrap min-w-0 ${r ? 'font-medium' : ''}">${r ? esc(r.name) : '· · ·'}</span>${r && crown(r.name) ? '<span class="flex-none" title="Grand Explorer">👑</span>' : ''}${r && r.perfect ? STAR : ''}${r && r.clock ? '<span class="fx-label flex-none">clock</span>' : ''}${r && tab === 'daily' && Number.isInteger(r.ms) ? `<span class="fx-label flex-none fx-rtime">${timeText(r.ms)}</span>` : ''}</span>
         <span class="fx-num text-lg">${r ? fmt(r.score) : ''}</span>
       </li>`;
     }).join('');
@@ -1793,6 +1857,12 @@
   const GOLD_PAGE = 4;                                   // gold stamps on one page: two across, two down
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   function ppPages() {
+    if (S.ppBook === 'reverse') {      // the Reverse passport: its cover and its continent pages
+      const got = revs(P.name).filter(a => C[a]), pages = [{ type: 'cover' }];
+      CONTS.forEach((name, ci) => { const mine = got.filter(a => C[a].cont === ci), total = POOL.filter(a => C[a].cont === ci).length, parts = Math.max(1, Math.ceil(mine.length / PER_PAGE));
+        for (let k = 0; k < parts; k++) pages.push({ type: 'stamps', name, total, count: mine.length, codes: mine.slice(k * PER_PAGE, (k + 1) * PER_PAGE), part: k + 1, parts }); });
+      return pages;
+    }
     const mine = stamps(P.name).filter(a => C[a]), pages = [{ type: 'cover' }, { type: 'id', total: mine.length }];
     const gold = perfects(P.name), goldParts = Math.max(1, Math.ceil(gold.length / GOLD_PAGE));
     for (let k = 0; k < goldParts; k++) pages.push({ type: 'gold', count: gold.length, list: gold.slice(k * GOLD_PAGE, (k + 1) * GOLD_PAGE), part: k + 1, parts: goldParts });
@@ -1816,6 +1886,7 @@
   function ppPage(n) {
     const pages = ppPages(), pg = pages[n];
     if (pg.type === 'cover') {
+      if (S.ppBook === 'reverse') return revCoverHTML(allIn(revs(P.name)));
       return coverHTML(tier(P.name));
     }
     if (pg.type === 'id') {
@@ -1854,7 +1925,7 @@
         <div class="pp-foot"><span>Honours</span><span>${n - 1}</span></div>
       </div>`;
     }
-    const ex = new Set(experts(P.name)), pl = new Set(plats(P.name)), di = new Set(diams(P.name)), lv = Math.min(tier(P.name), 3);
+    const book = S.ppBook === 'reverse', ex = new Set(book ? [] : experts(P.name)), pl = new Set(book ? [] : plats(P.name)), di = new Set(book ? [] : diams(P.name)), lv = book ? 0 : Math.min(tier(P.name), 3);
     // each stamp shows the highest mark it has earned: a gold star, a platinum star, or a diamond
     const mark = a => di.has(a) ? '<b class="pp-xs di" title="Named in 5 seconds or less">◆</b>' : pl.has(a) ? '<b class="pp-xs pl" title="Named with no hints and its bonus question answered">★</b>'
       : ex.has(a) ? '<b class="pp-xs" title="Named with no hints">★</b>' : '';
@@ -1880,23 +1951,30 @@
     `Platinum passport complete. A diamond goes on a stamp when you name that flag with no hints in ${DIAMOND_SECS} seconds or less. Earn all ${POOL.length} for the Diamond passport.`,
     `Every level complete: Expert, Gold, Platinum and Diamond. The whole world, known in a flash.`];
   // The cover for each level: navy, then starry Expert, gold, brushed platinum and sparkling diamond.
+  function revCoverHTML(done) {
+    return `<div class="pp-cover reverse${done ? ' done' : ''}"><span class="pp-cover-t">Reverse</span>${EMBLEM}<span class="pp-cover-b">Flag Explorer<small>${done ? 'Every flag found' : 'Name to flag'}</small></span></div>`;
+  }
   function coverHTML(t) {
     const cls = ['', ' expert', ' gold', ' platinum', ' diamond'][Math.min(t, 4)], sub = ['', 'Expert · every country stamped', 'Gold · every flag, no hints', 'Platinum · every country known', 'Diamond · lightning recall'][Math.min(t, 4)];
     return `<div class="pp-cover${cls}"><span class="pp-cover-t">Passport</span>${EMBLEM}<span class="pp-cover-b">Flag Explorer${sub ? `<small>${sub}</small>` : ''}</span></div>`;
   }
   function viewPassport() {
-    const t = tier(P.name), lv = Math.min(t, 3), pages = ppPages(), done = lv > 0, total = lv ? levelHave(P.name, lv) : pages[1].total;
-    const unit = ['stamped', 'gold stars', 'platinum stars', 'diamonds'][lv], tone = ['', 'var(--gold)', '#9AA3AF', '#3BA9DC'][lv];
+    if (S.ppBook === 'reverse' && !revOpen(P.name)) S.ppBook = 'world';
+    const book = S.ppBook === 'reverse', t = tier(P.name), lv = book ? 0 : Math.min(t, 3), pages = ppPages(), done = !book && lv > 0;
+    const total = book ? revs(P.name).filter(a => C[a]).length : lv ? levelHave(P.name, lv) : pages[1].total;
+    const unit = book ? 'found' : ['stamped', 'gold stars', 'platinum stars', 'diamonds'][lv], tone = book ? '#2C9A8F' : ['', 'var(--gold)', '#9AA3AF', '#3BA9DC'][lv];
+    const books = revOpen(P.name) ? `<div class="grid grid-cols-2 gap-2 mb-3" role="group" aria-label="Which passport" id="fx-ppbooks"><button type="button" class="fx-pick" data-act="ppbook" data-v="world" aria-pressed="${!book}">🛂 Passport</button><button type="button" class="fx-pick" data-act="ppbook" data-v="reverse" aria-pressed="${book}">🔄 Reverse</button></div>` : '';
     S.pp = Math.min(S.pp || 0, pages.length - 1);
     return `<main class="fx-sheet mx-auto max-w-xl">
       <div class="fx-band flex items-end justify-between gap-3">
-        <div class="min-w-0"><p class="fx-label">Passport of</p><h1 class="fx-h text-3xl fx-clip whitespace-nowrap">${esc(P.name)}</h1></div>
+        <div class="min-w-0"><p class="fx-label">${book ? 'Reverse passport of' : 'Passport of'}</p><h1 class="fx-h text-3xl fx-clip whitespace-nowrap">${esc(P.name)}</h1></div>
         <p class="fx-label flex-none text-right"><span class="fx-num">${total}</span><br>of ${POOL.length} ${unit}</p>
       </div>
-      <div class="fx-meter" role="img" aria-label="${total} of ${POOL.length} ${done ? unit : 'flags stamped'}"><i style="width:${(100 * total / POOL.length).toFixed(1)}%${tone ? ';background:' + tone : ''}"></i></div>
+      ${books}
+      <div class="fx-meter" role="img" aria-label="${total} of ${POOL.length} ${done || book ? unit : 'flags stamped'}"><i style="width:${(100 * total / POOL.length).toFixed(1)}%${tone ? ';background:' + tone : ''}"></i></div>
       <div class="pp-stage mt-2"><div class="pp-book" id="pp-book" role="button" tabindex="0" data-act="pp-flip" aria-label="Passport. Tap the right side to turn the page, the left side to go back."><div class="pp-leaf">${ppPage(S.pp)}</div></div></div>
       <div class="flex items-center justify-between gap-3" id="pp-nav">${ppNav(S.pp, pages.length)}</div>
-      <p class="text-ink-soft text-sm text-center mt-2" id="pp-rule">${LEVEL_RULE[Math.min(t, 4)]}</p>
+      <p class="text-ink-soft text-sm text-center mt-2" id="pp-rule">${book ? (allIn(revs(P.name)) ? `Reverse passport complete: you found the flag of every country.` : `A country is stamped here the first time you pick its flag in a Reverse round. Find all ${POOL.length}.`) : LEVEL_RULE[Math.min(t, 4)]}</p>
       <button class="fx-go mt-5" data-act="back">Back</button>
     </main>`;
   }
@@ -1951,8 +2029,9 @@
       <div class="flex justify-between gap-3 fx-label"><span>Flag ${String(S.i + 1).padStart(2, '0')}</span><span id="fx-pos"></span></div>
       ${S.limit ? `<div class="fx-clock" aria-hidden="true"><i id="fx-clock-bar"></i></div>` : ''}
       <div class="fx-flagbox">
-        <img class="fx-flag" style="--ar:${c.ar}" data-flag="${q.a2}" alt="The flag to identify">
+        <img class="fx-flag" style="--ar:${c.ar}" data-flag="${q.a2}" alt="${S.reverse ? 'The flag of ' + esc(c.name) : 'The flag to identify'}">
         <div class="fx-seal">${COMPASS(56)}<span class="fx-label">Sealed until you decide</span></div>
+        ${S.reverse ? `<div class="fx-revname"><span class="fx-label">Find the flag of</span><b>${esc(c.name)}</b></div>` : ''}
       </div>
       <figcaption class="fx-caption" id="fx-cap"></figcaption>
     </figure>
@@ -1976,6 +2055,13 @@
     </button>`;
   }
 
+  // Reverse rounds: each answer is a flag. Its country is named only once the question is over.
+  function flagBtn(a, i, state, named) {
+    const mark = state === 'right' ? '✓' : state === 'wrong' ? '✕' : '';
+    return `<button class="fx-opt fx-optflag ${state}" data-act="answer" data-i="${i}" ${state ? 'disabled' : ''} aria-label="${named ? esc(C[a].name) : `Flag ${'ABCD'[i]}`}">
+      <span class="fx-key">${'ABCD'[i]}</span><span class="fx-optimg"><img data-flag="${a}" alt="">${named ? `<small>${esc(C[a].name)}</small>` : ''}</span><span class="fx-mark" aria-hidden="true">${mark}</span>
+    </button>`;
+  }
   const facts = c => `<p class="text-sm text-ink-soft mt-3 text-center">Capital <b class="text-ink font-semibold">${esc(c.cap)}</b> · ${esc(contName(c))} · about ${fmtPop(c.pop)} people</p>`;
   function nextBtn() {
     const last = S.i >= S.round.length - 1;
@@ -2012,13 +2098,13 @@
         </div>
         ${tipOn ? `<p class="fx-tip" id="fx-tip"><b>Tip:</b> stuck? A hint costs a few points and the bonus question, but beats a miss.</p>` : ''}
         ${tipOn ? '' : `<p class="fx-label fx-hint-l"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.6 11.2C4.2 10.3 3.3 8.8 3.3 7.1a4.7 4.7 0 0 1 9.4 0c0 1.7-.9 3.2-2.3 4.1v1.1H5.6z"/><path d="M6.3 14.3h3.4"/></svg>${q.wager ? 'No hints on a wagered flag' : q.hints.length ? 'Hints used on this flag' : 'Need a hint? Tap one'}</p>`}
-        <div class="grid grid-cols-3 gap-2 mt-1.5" role="group" aria-label="Hints">${HINTS.map(hintBtn).join('')}</div>
-        <div class="grid grid-cols-2 gap-2 mt-3">${q.options.map((a, i) => optBtn(C[a].name, i, q.out.includes(a) ? 'out' : '', 'answer')).join('')}</div>`;
+        <div class="grid ${S.reverse ? 'grid-cols-1' : 'grid-cols-3'} gap-2 mt-1.5" role="group" aria-label="Hints">${HINTS.filter(h => !S.reverse || h.id === 'fifty').map(hintBtn).join('')}</div>
+        <div class="grid grid-cols-2 gap-2 mt-3">${q.options.map((a, i) => S.reverse ? flagBtn(a, i, q.out.includes(a) ? 'out' : '', false) : optBtn(C[a].name, i, q.out.includes(a) ? 'out' : '', 'answer')).join('')}</div>`;
     }
 
     if (q.phase === 'result') {
-      const flagOpts = `<div class="grid grid-cols-2 gap-2 mt-3">${q.options.map((a, i) =>
-        optBtn(C[a].name, i, a === q.a2 ? 'right' : a === q.pick ? 'wrong' : q.out.includes(a) ? 'out' : 'dim', 'answer')).join('')}</div>`;
+      const flagOpts = `<div class="grid grid-cols-2 gap-2 mt-3">${q.options.map((a, i) => { const st = a === q.a2 ? 'right' : a === q.pick ? 'wrong' : q.out.includes(a) ? 'out' : 'dim';
+        return S.reverse ? flagBtn(a, i, st, true) : optBtn(C[a].name, i, st, 'answer'); }).join('')}</div>`;
       const gain = e.pts + e.streakPts + e.speedPts + e.wagerPts, bits = [];
       let stamp, tail;
       if (!e.ok) {
@@ -2066,8 +2152,8 @@
   }
 
   // A flag that earned something new for the passport this round: a stamp, a gold star, a platinum star or a diamond.
-  const newMarks4 = e => [e.newStamp && ['stamp', 'New stamp'], e.newStar && ['star', 'New ★'], e.newPlat && ['plat', 'New ✦'], e.newDiam && ['diam', 'New ◆']]
-    .filter(Boolean).map(([k, label]) => ` <span class="fx-new ${k}" title="${{ stamp: 'A new stamp in your passport', star: 'A new gold star', plat: 'A new platinum star', diam: 'A new diamond' }[k]}">${label}</span>`).join('');
+  const newMarks4 = e => [e.newStamp && ['stamp', 'New stamp'], e.newStar && ['star', 'New ★'], e.newPlat && ['plat', 'New ✦'], e.newDiam && ['diam', 'New ◆'], e.newRev && ['rev', 'New 🔄']]
+    .filter(Boolean).map(([k, label]) => ` <span class="fx-new ${k}" title="${{ stamp: 'A new stamp in your passport', star: 'A new gold star', plat: 'A new platinum star', diam: 'A new diamond', rev: 'A new stamp in your Reverse passport' }[k]}">${label}</span>`).join('');
   const logRows = log => log.map((e, i) => `<li class="flex items-center gap-3 py-1.5 ${i ? 'border-t border-dotted border-rule' : ''}">
         <span class="fx-label w-6 flex-none">${String(i + 1).padStart(2, '0')}</span>
         <img class="fx-thumb" data-flag="${e.a2}" alt="">
@@ -2120,19 +2206,20 @@
   // The passport strip on the results screen: what the round added, how far along the passport is, and the countdown.
   function stampNote(s, name) {
     // the strip follows the level the round began on
-    const t0 = s.lv0 !== undefined ? s.lv0 : s.done0 ? 1 : 0;
-    if (s.practice || t0 > 3) return '';
-    const L = LEVELS[t0], have = levelHave(name, t0), left = POOL.length - have, n = [s.newStamps, s.newExpert, s.newPlat, s.newDiam][t0] || 0;
+    const t0 = s.reverse ? 0 : s.lv0 !== undefined ? s.lv0 : s.done0 ? 1 : 0;
+    if (s.practice || (t0 > 3 && !s.reverse)) return '';
+    const L = s.reverse ? REV : LEVELS[t0], have = s.reverse ? revs(name).filter(a => C[a]).length : levelHave(name, t0), left = POOL.length - have, n = s.reverse ? s.newRev : [s.newStamps, s.newExpert, s.newPlat, s.newDiam][t0] || 0;
+    if (s.reverse && !left && !n) return '';
     const news = (n ? plural(n, 'new ' + L.one) : `No new ${L.many} this round`) + (left ? '' : ` · ${L.title} complete!`);
     // the countdown: a step of five crossed from 75 to go, then every round in the last stretch
     const step = Math.ceil(left / 5) * 5, crossed = left > 0 && left < s.left0 && step < s.left0 && step <= COUNTDOWN;
     const count = left && left <= LAST_STRETCH ? `Only ${left} to go for ${L.goal}. Free play now deals ${left === 1 ? 'it' : 'them'} more often.`
-      : crossed ? `${left} ${left === 1 ? L.one.replace(/^(gold|platinum) /, '') : L.many.replace(/^(gold|platinum) /, '')} to go for ${L.goal}!` : '';
-    const intro = !s.intro ? '' : [`Every flag you name earns a stamp in your passport. Stamp all ${POOL.length} countries for the Expert passport.`,
+      : crossed ? `${left} ${left === 1 ? L.one.replace(/^(gold|platinum|reverse) /, '') : L.many.replace(/^(gold|platinum|reverse) /, '')} to go for ${L.goal}!` : '';
+    const intro = !s.intro || s.reverse ? '' : [`Every flag you name earns a stamp in your passport. Stamp all ${POOL.length} countries for the Expert passport.`,
       `Name a flag with no hints and its stamp earns a gold star. Star all ${POOL.length} for the Gold passport.`,
       `Name a flag with no hints and answer its bonus question for a platinum star. Earn all ${POOL.length} for the Platinum passport.`,
       `Name a flag with no hints in ${DIAMOND_SECS} seconds or less for a diamond. Earn all ${POOL.length} for the Diamond passport.`][t0];
-    return `<button type="button" class="fx-pstrip t${t0} ${t0 || !left ? 'gold' : ''}" data-act="passport" id="fx-pstrip" aria-label="Open your passport. ${esc(news)}. ${have} of ${POOL.length}.">
+    return `<button type="button" class="fx-pstrip ${s.reverse ? 'rev' : `t${t0}`} ${t0 || !left ? 'gold' : ''}" data-act="passport" data-v="${s.reverse ? 'reverse' : 'world'}" id="fx-pstrip" aria-label="Open your passport. ${esc(news)}. ${have} of ${POOL.length}.">
         <span class="flex items-baseline justify-between gap-3"><span class="fx-label">${L.label}</span><span class="fx-label">Open ›</span></span>
         <span class="flex items-baseline justify-between gap-3 mt-1"><b class="font-semibold" id="fx-stamp-note">${news}</b><span class="fx-num whitespace-nowrap">${have}<span class="text-ink-soft font-normal"> of ${POOL.length}</span></span></span>
         <span class="fx-meter mt-2" aria-hidden="true"><i style="width:${(100 * have / POOL.length).toFixed(1)}%"></i></span>
@@ -2151,21 +2238,31 @@
       <p>You know every country, not just its flag.</p>
       <p><b class="font-semibold">Next, the Diamond passport:</b> name a flag with no hints in ${DIAMOND_SECS} seconds or less for a diamond.</p></div>`;
     if (key === 'diamond') return `<div class="fx-feat big" id="fx-feat-diamond"><p class="fx-label">Every flag in ${DIAMOND_SECS} seconds</p><h2>💎 Diamond passport complete</h2>
-      <p>Every level of the passport is complete. The whole world, known in a flash.</p></div>`;
+      <p>Every level of the passport is complete. You are now a <b>Grand Explorer</b> 👑.</p></div>`;
+    if (key === 'reverse') return `<div class="fx-feat big" id="fx-feat-reverse"><p class="fx-label">The flag of every country</p><h2>🔄 Reverse passport complete</h2>
+      <p>You found the flag of all ${POOL.length} countries from their names alone.</p></div>`;
     const ci = +key.slice(1);
     return `<div class="fx-feat" data-feat="${key}"><h2>🗺️ ${CONTS[ci]} complete</h2><p>All ${CONT_CODES[ci].length} of its flags are stamped in your passport.</p></div>`;
   }
   // The whole-screen celebration: a completed level, a level newly open, or milestones this device has not celebrated yet.
   function viewCheer() {
     const keys = S.cheer.keys, name = esc(P.name), cover = t => `<div class="fx-cheer-book" aria-hidden="true">${coverHTML(t)}</div>`;
-    const buttons = label => `<button class="fx-go mt-5" data-act="cheer-passport" data-primary>${label}</button><button class="fx-quiet block mx-auto mt-3" data-act="cheer-close">Keep playing</button>`;
+    const buttons = (label, v = 'world') => `<button class="fx-go mt-5" data-act="cheer-passport" data-v="${v}" data-primary>${label}</button><button class="fx-quiet block mx-auto mt-3" data-act="cheer-close">Keep playing</button>`;
+    const revCover = () => `<div class="fx-cheer-book" aria-hidden="true">${revCoverHTML(allIn(revs(P.name)))}</div>`;
     const next = (title, text, have) => `<div class="fx-cheer-next"><b class="font-semibold">${title}</b><p>${text}${have ? ` You have ${have} already.` : ''}</p></div>`;
     const PLAT = `Name a flag with <b>no hints</b> and then answer its <b>bonus question</b> right, and its stamp earns a platinum star. Earn all ${POOL.length} to complete it.`;
     const DIAM = `Name a flag with <b>no hints</b> in <b>${DIAMOND_SECS} seconds or less</b>, in any game, and its stamp earns a diamond. Earn all ${POOL.length} to complete it.`;
     const n = (list, one) => list.length ? plural(list.length, one) : '';
     let body;
-    if (keys.includes('diamond')) body = `${cover(4)}<p class="fx-label">Every flag in ${DIAMOND_SECS} seconds</p><h2 id="fx-cheer-h">Diamond passport!</h2>
-      <p>${name}, you have named all ${POOL.length} flags, with no hints, in ${DIAMOND_SECS} seconds or less. Every level of the passport is complete: Expert, Gold, Platinum and Diamond. The whole world, known in a flash.</p>${buttons('See my Diamond passport')}`;
+    if (keys.includes('diamond')) { const hall = grandList(), place = hall.findIndex(g => pidOf(g.name) === pidOf(P.name)) + 1;
+      body = `${cover(4)}<p class="fx-label">Every flag in ${DIAMOND_SECS} seconds</p><h2 id="fx-cheer-h">👑 Grand Explorer!</h2>
+      <p>${name}, you have completed the Diamond passport: all ${POOL.length} flags, with no hints, in ${DIAMOND_SECS} seconds or less. Every level is done: Expert, Gold, Platinum and Diamond.</p>
+      ${next('👑 Your new title', `You are now a <b>Grand Explorer</b>. A crown goes beside your name on every scoreboard${place ? `, and you are <b>${place === 1 ? 'the first' : ordinal(place)}</b> in the Hall of Fame` : ''}.`)}${buttons('See my Diamond passport')}`; }
+    else if (keys.includes('reverse')) body = `${revCover()}<p class="fx-label">The flag of every country</p><h2 id="fx-cheer-h">Reverse passport!</h2>
+      <p>${name}, you have found the flag of all ${POOL.length} countries from their names alone.</p>${buttons('See my Reverse passport', 'reverse')}`;
+    else if (keys.includes('lv-reverse')) body = `${revCover()}<p class="fx-label">Unlocked by your Expert passport</p><h2 id="fx-cheer-h">New: Reverse</h2>
+      <p>${name}, a new way to play is open to you. You see a country's name and pick its flag from four look-alikes.</p>
+      ${next('How it works', `Choose <b>🔄 Reverse</b> on the Choose your game screen. Every flag you pick correctly earns a stamp in your new <b>Reverse passport</b>. Find all ${POOL.length}. Reverse rounds do not change your main passport.`)}${buttons('See my Reverse passport', 'reverse')}`;
     else if (keys.includes('platinum')) body = `${cover(3)}<p class="fx-label">Every flag and its bonus question</p><h2 id="fx-cheer-h">Platinum passport!</h2>
       <p>${name}, you know every country, not just its flag. Your passport is now platinum.</p>${next(`What's next: the Diamond passport`, DIAM, n(diams(P.name), 'diamond'))}${buttons('See my Platinum passport')}`;
     else if (keys.includes('expert')) body = `${cover(2)}<p class="fx-label">Every flag, not one hint</p><h2 id="fx-cheer-h">Gold passport!</h2>
@@ -2177,7 +2274,8 @@
       <p>${name}, a new level is open.</p>${next('How to earn it', DIAM, n(diams(P.name), 'diamond'))}${buttons('See my Platinum passport')}`;
     else if (keys.includes('world')) body = `${cover(1)}<p class="fx-label">Every country in the world</p><h2 id="fx-cheer-h">Expert passport!</h2>
       <p>${name}, you have stamped all ${POOL.length} countries. Your passport is complete and has its Expert cover.</p>
-      ${next(`What's next: the Gold passport`, `Every flag you name with <b>no hints</b> now earns a gold star on its stamp. Star all ${POOL.length} to complete it.`, n(experts(P.name), 'gold star'))}${buttons('See my Expert passport')}`;
+      ${next(`What's next: the Gold passport`, `Every flag you name with <b>no hints</b> now earns a gold star on its stamp. Star all ${POOL.length} to complete it.`, n(experts(P.name), 'gold star'))}
+      ${next('🔄 Unlocked: Reverse', `A new way to play, next to Free play: see a country's name and pick its flag from four look-alikes. It has a passport of its own.`)}${buttons('See my Expert passport')}`;
     else { const names = keys.map(k => CONTS[+k.slice(1)]), flags = keys.reduce((n, k) => n + CONT_CODES[+k.slice(1)].length, 0), have = stamps(P.name).filter(a => C[a]).length;
       body = `${cover(0)}<p class="fx-label">Passport milestone</p><h2 id="fx-cheer-h">🗺️ ${listOf(names)} complete</h2>
       <p>${name}, every one of ${keys.length > 1 ? `their ${flags}` : `its ${flags}`} flags is stamped in your passport. ${have} of ${POOL.length} countries so far; stamp them all for the Expert passport.</p>${buttons('See my passport')}`; }
@@ -2193,10 +2291,11 @@
   function owedCheer() {
     if (S.screen !== 'rules' || S.cheer || !P) return;
     let due = owed(P.name);
-    if (!due.length) {          // a level newly open to a player who finished the one before it earlier
-      const t = tier(P.name), open = t === 2 ? 'lv-platinum' : t === 3 ? 'lv-diamond' : null;
-      if (!open || cheered(P.name).includes(open)) return;
-      due = [open];
+    if (!due.length) {          // a level or game newly open to a player who earned it earlier
+      const t = tier(P.name), seen = cheered(P.name);
+      const open = [t === 2 && 'lv-platinum', t === 3 && 'lv-diamond', revOpen(P.name) && 'lv-reverse'].filter(k => k && !seen.includes(k));
+      if (!open.length) return;
+      due = [open[0]];
     }
     S.cheer = { keys: headline(due) }; cheer(P.name, due);
     SFX.perfect(); confetti(true);
@@ -2354,7 +2453,8 @@
       if (plate.dataset.key !== S.i + q.a2) { plate.innerHTML = viewPlate(); plate.dataset.key = S.i + q.a2; }
       const sealed = q.phase === 'wager', revealed = !sealed && q.phase !== 'guess', cap = app.querySelector('#fx-cap');
       plate.firstElementChild.classList.toggle('sealed', sealed);
-      cap.textContent = sealed ? 'The final flag' : revealed ? c.name : 'Which country flies this flag?';
+      plate.firstElementChild.classList.toggle('rev-ask', !!S.reverse && !revealed);
+      cap.textContent = sealed ? 'The final flag' : revealed ? c.name : S.reverse ? 'Which of these is its flag?' : 'Which country flies this flag?';
       cap.classList.toggle('named', revealed);
       app.querySelector('#fx-pos').textContent = revealed ? coords(c) : sealed ? 'Final flag' : 'Destination unknown';
       app.querySelector('#fx-panel').innerHTML = viewPanel();
@@ -2489,7 +2589,8 @@
     if (act === 'board') { S.back = S.screen; S.screen = 'board'; S.confirmWipe = false; S.tab = S.back === 'end' || S.back === 'match' ? S.table : S.tab || O.pool; cloudSoon(); return go(); }
     if (act === 'how') { S.how = !S.how; SFX.tap(); return render(false); }
     if (act === 'cheer-close') { S.cheer = null; SFX.tap(); return render(false); }
-    if (act === 'passport' || act === 'cheer-passport') { S.cheer = null; S.back = S.screen; S.screen = 'passport'; S.pp = 0; turning = false; return go(); }
+    if (act === 'passport' || act === 'cheer-passport') { S.ppBook = el.dataset.v === 'reverse' ? 'reverse' : 'world'; S.cheer = null; S.back = S.screen; S.screen = 'passport'; S.pp = 0; turning = false; return go(); }
+    if (act === 'ppbook') { S.ppBook = el.dataset.v; S.pp = 0; turning = false; SFX.tap(); return render(false); }
     if (act === 'pp-next') return turnTo(S.pp + 1);
     if (act === 'pp-prev') return turnTo(S.pp - 1);
     if (act === 'pp-flip') { const r = el.getBoundingClientRect(); return turnTo(S.pp + (S.pp > 0 && ev.clientX - r.left < r.width * .3 ? -1 : 1)); }
@@ -2502,7 +2603,7 @@
       if (err) { app.querySelector('#fx-party-err').textContent = err; const box = [...app.querySelectorAll('.fx-guest')].find(b => !cleanName(b.value)); if (box) box.focus(); return; }
       SFX.tap(); startMatch(0); top = true;
     }
-    else if (act === 'again' || act === 'play') { if (act === 'again') O.mode = 'free'; SFX.tap(); newRound(); top = true; }
+    else if (act === 'again' || act === 'play') { if (act === 'again') O.mode = S.reverse ? 'reverse' : 'free'; if (O.mode === 'reverse' && !revOpen(P.name)) O.mode = 'free'; SFX.tap(); newRound(); top = true; }
     else if (act === 'rematch') { const first = M.first + 1; P = M.seats[0].P; SFX.tap(); startMatch(first); top = true; }
     else if (act === 'ready') { SFX.tap(); S.screen = 'play'; startQuestion(); top = true; }
     else if (act === 'wager') { setWager(+el.dataset.v); SFX.tap(); focus = false; }
@@ -2566,6 +2667,6 @@
   if (hot && hot.snapshot) hot.snapshot(() => ({ S, P, M }));
   if (hot && hot.ready) hot.ready(data => boot(data || liveSaved())); else boot((hot && hot.data) || liveSaved());
 
-  window.__fx = { streaksOf, tier, plats, diams, coverHTML, showGroup, playedToday, groups, stampNote, ppLinkText, owed, timeText, dayWinners, DAY_CLOCK, DAY_CLOCK_FROM, byScore, experts, achieved, newMarks, stillMissing, passportDone, featsOn, CONT_CODES, POOL, dayText, winsTable, daysBook, dayShift, family, cloudSync, cloudState, pidOf, perfects, deck, markSeen, seenList, get match() { return M; }, standings, fitOpts, get sound() { return { ac, master, keepAlive, IOS }; }, ppPages, flagWorth, streakBonus, speedBonus, totals, entryTotal, get state() { return S; }, get player() { return P; }, get opts() { return O; }, C, POOLS, KNOWN, buildRound, tableRows, stamps, todayKey, AVATARS };
+  window.__fx = { revs, grandList, streaksOf, tier, plats, diams, coverHTML, showGroup, playedToday, groups, stampNote, ppLinkText, owed, timeText, dayWinners, DAY_CLOCK, DAY_CLOCK_FROM, byScore, experts, achieved, newMarks, stillMissing, passportDone, featsOn, CONT_CODES, POOL, dayText, winsTable, daysBook, dayShift, family, cloudSync, cloudState, pidOf, perfects, deck, markSeen, seenList, get match() { return M; }, standings, fitOpts, get sound() { return { ac, master, keepAlive, IOS }; }, ppPages, flagWorth, streakBonus, speedBonus, totals, entryTotal, get state() { return S; }, get player() { return P; }, get opts() { return O; }, C, POOLS, KNOWN, buildRound, tableRows, stamps, todayKey, AVATARS };
 })();
 </script>
