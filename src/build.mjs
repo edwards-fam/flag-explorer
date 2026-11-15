@@ -11,7 +11,7 @@ const args = process.argv.slice(2), mode = args.includes('--artifact') ? 'artifa
 const countries = JSON.parse(fs.readFileSync('countries.json', 'utf8')), flags = JSON.parse(fs.readFileSync('flags.json', 'utf8'));
 const subs = [...new Set(countries.map(c => c.sub))];
 const rows = countries.map(o => [o.a2, o.name, o.cap, o.cont, subs.indexOf(o.sub), o.pop, o.lat, o.lng, o.borders.join(' '), o.decoys.join(' '), o.ar]);
-const data = JSON.stringify({ c: rows, f: flags }).replace(/</g, '\\u003c');
+const data = JSON.stringify({ c: rows, f: flags, s: subs }).replace(/</g, '\\u003c');      // s: the region names, which the rows refer to by number
 let tpl = fs.readFileSync('template.html', 'utf8');
 if (!tpl.includes('/*__DATA__*/null')) throw new Error('data marker missing from template.html');
 tpl = tpl.replace('/*__DATA__*/null', () => data);

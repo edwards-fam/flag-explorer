@@ -501,7 +501,7 @@
   /* ---------- Data ---------- */
   const D = window.FX_DATA;
   const CONTS = ['Africa', 'Asia', 'Europe', 'North America', 'South America', 'Oceania'];
-  const C = {}, POOL = [];
+  const C = {}, POOL = [], SUBS = D.s || [];      // SUBS: region names; a country's sub is its number in this list
   for (const r of D.c) {
     C[r[0]] = { a2: r[0], name: r[1], cap: r[2], cont: r[3], sub: r[4], pop: r[5], lat: r[6], lng: r[7],
       borders: r[8] ? r[8].split(' ') : [], decoys: r[9].split(' '), ar: r[10] };
@@ -1260,19 +1260,37 @@
 
   /* ---------- A round ---------- */
   // Everything about a round is decided up front, which is what lets the daily challenge be identical for everyone.
-  function buildRound(codes) {
+  /* Bonus questions. From BQ_FROM there are eight kinds instead of four, wrong answers vary more, and a player is not given
+     the kind of question they last had for a country (Today's challenge keeps one set of questions for everyone). */
+  const BQ_FROM = '2026-11-19';
+  const bqOn = () => todayKey() >= BQ_FROM;
+  const OLD_KINDS = ['capital', 'continent', 'population', 'neighbour'];
+  const bqSeen = name => (store.get('fx-bq', {}) || {})[plain(name)] || {};
+  function bqNote(name, a2, kind) {
+    if (!name || !kind) return;
+    const all = store.get('fx-bq', {}) || {}, k = plain(name), mine = all[k] || {};
+    mine[a2] = [...(mine[a2] || []).filter(x => x !== kind), kind].slice(-3); all[k] = mine; store.set('fx-bq', all);
+  }
+  function buildRound(codes, name = null) {
     let bag = [];
+    const kinds = bqOn() ? Object.keys(BONUS_MAKERS) : OLD_KINDS, seen = name && bqOn() ? bqSeen(name) : {};
     return codes.map(a2 => {
       const c = C[a2];
       // One wrong answer always comes from the two closest look-alikes; the other two lean towards the front of the list.
       const [lead] = weightedPick(c.decoys.slice(0, 2), 1);
       const rest = weightedPick(c.decoys.filter(d => d !== lead), 2);
       const options = shuffle([a2, lead, ...rest]);
-      // The four kinds of bonus question are dealt from a shuffled hand so they keep rotating.
-      const can = { capital: capOK(c), continent: !NO_CONT_Q.has(a2), population: true, neighbour: c.borders.length > 0 };
-      let k = bag.findIndex(t => can[t]);
-      if (k < 0) { bag = shuffle(Object.keys(BONUS_MAKERS)); k = bag.findIndex(t => can[t]); }
-      return { a2, options, lead, bonus: BONUS_MAKERS[bag.splice(k, 1)[0]](c) };
+      // The kinds of bonus question are dealt from a shuffled hand so they keep rotating; the kinds this player had last
+      // for this country are passed over while another will do.
+      const on = bqOn();
+      const can = { capital: on ? capOK(c) || a2 === 'BO' : capOK(c), continent: !NO_CONT_Q.has(a2), population: true, neighbour: c.borders.length > 0,
+        capitalOf: capOK(c) || a2 === 'BO', borders: true, region: !!SUBS[c.sub] && !CONTS.includes(SUBS[c.sub]), most: true };
+      const ok = t => kinds.includes(t) && can[t], last = (seen[a2] || []).slice(-2), fresh = t => ok(t) && !last.includes(t);
+      let k = bag.findIndex(fresh);
+      if (k < 0) k = bag.findIndex(ok);
+      if (k < 0) { bag = shuffle([...kinds]); k = bag.findIndex(fresh); if (k < 0) k = bag.findIndex(ok); }
+      const kind = bag.splice(k, 1)[0];
+      return { a2, options, lead, bonus: Object.assign(BONUS_MAKERS[kind](c), { kind }) };
     });
   }
 
@@ -1308,7 +1326,7 @@
       codes = shuffle([...lean, ...deck(pool.filter(a => !lean.includes(a)), ROUND).slice(0, ROUND - lean.length)]);
       markSeen(codes);
     }
-    const round = buildRound(codes);
+    const round = buildRound(codes, daily ? null : P.name);
     rand = Math.random;
     M = null;
     const reverse = O.mode === 'reverse';
@@ -1355,7 +1373,7 @@
     store.set('fx-party', { each: O.each, guests: O.guests });
     const people = [P, ...O.guests], hands = dealMatch(people.length, O.each);
     people.forEach(rememberPerson);
-    const seats = people.map((who, k) => ({ P: { name: who.name, avatar: who.avatar }, S: roundState(buildRound(hands[k]), who.name, { party: true, record: O.each === ROUND }) }));
+    const seats = people.map((who, k) => ({ P: { name: who.name, avatar: who.avatar }, S: roundState(buildRound(hands[k], who.name), who.name, { party: true, record: O.each === ROUND }) }));
     M = { seats, turn: 0, first: first % seats.length, each: O.each, over: false };
     takeSeat(M.first);
   }
@@ -1399,7 +1417,7 @@
 
   // Today's challenge times the bonus question too, so it cannot be looked up; free play's clock is for the flag alone.
   const bonusTimed = () => !!(S.limit && S.mode === 'daily');
-  function beginBonus() { S.q.phase = 'bonus'; S.q.t0 = Date.now(); }
+  function beginBonus() { S.q.phase = 'bonus'; S.q.t0 = Date.now(); bqNote(P.name, S.q.a2, S.q.bonus.kind); }
   // The time an answer took, counted towards the round's time. A timed-out answer counts as the full allowance.
   function addTime(secs) { if (S.limit) S.ms = (S.ms || 0) + Math.round(1000 * Math.min(S.limit, Math.max(0, secs))); }
 
@@ -1499,14 +1517,15 @@
       return pack('Capital city', `What is the capital of ${the(c)}?`, c.cap, wrong.slice(0, 3));
     },
     continent(c) {
-      const near = { 0: [1, 2, 4], 1: [2, 0, 5], 2: [1, 0, 3], 3: [4, 2, 5], 4: [3, 0, 5], 5: [1, 4, 0] }[c.cont];
+      const near = bqOn() ? shuffle([0, 1, 2, 3, 4, 5].filter(i => i !== c.cont)).slice(0, 3) : { 0: [1, 2, 4], 1: [2, 0, 5], 2: [1, 0, 3], 3: [4, 2, 5], 4: [3, 0, 5], 5: [1, 4, 0] }[c.cont];
       return pack('Continent', `Which continent is ${the(c)} on?`, CONTS[c.cont], near.map(i => CONTS[i]));
     },
     population(c) {
-      // Four answers on a ladder, each four times the last; the true figure sits on a random rung.
-      const rungs = [0, 1, 2, 3].filter(k => c.pop * Math.pow(4, 3 - k) <= 2.2e9 && c.pop / Math.pow(4, k) >= 400);
+      // Four answers on a ladder, each a few times the last; the true figure sits on a random rung.
+      const step = bqOn() ? [3, 4, 5][Math.floor(rand() * 3)] : 4;
+      const rungs = [0, 1, 2, 3].filter(k => c.pop * Math.pow(step, 3 - k) <= 2.2e9 && c.pop / Math.pow(step, k) >= 400);
       const k = rungs[Math.floor(rand() * rungs.length)];
-      const opts = [0, 1, 2, 3].map(j => 'About ' + fmtPop(c.pop * Math.pow(4, j - k)));
+      const opts = [0, 1, 2, 3].map(j => 'About ' + fmtPop(c.pop * Math.pow(step, j - k)));
       return { type: 'population', label: 'Population', prompt: `Roughly how many people live in ${the(c)}?`, options: opts, answer: k, pick: null };
     },
     neighbour(c) {
@@ -1517,11 +1536,35 @@
       [...shuffle(second), ...shuffle(POOL.filter(a => C[a].sub === c.sub)), ...shuffle(POOL.filter(a => C[a].cont === c.cont)), ...shuffle(POOL)]
         .forEach(a => { if (ok(a) && !wrong.includes(a) && wrong.length < 3) wrong.push(a); });
       return pack('Neighbour', `Which of these shares a land border with ${the(c)}?`, C[right].name, wrong.map(a => C[a].name));
+    },
+    // From 19 November: the capital the other way round, how many neighbours, the region, and who has the most people.
+    capitalOf(c) {
+      const wrong = [], add = a => { if (a !== c.a2 && !wrong.includes(a) && wrong.length < 3) wrong.push(a); };
+      [...shuffle(c.borders), ...shuffle(POOL.filter(a => C[a].sub === c.sub)), ...shuffle(POOL.filter(a => C[a].cont === c.cont))].forEach(add);
+      return pack('Capital city', `${c.cap} is the capital of which country?`, c.name, wrong.map(a => C[a].name));
+    },
+    borders(c) {
+      const n = c.borders.length, say = v => v === 0 ? 'None' : v === 1 ? '1 country' : `${v} countries`, vals = [n];
+      for (const d of shuffle([1, 2, 3, -1, -2, -3])) if (vals.length < 4 && n + d >= 0 && !vals.includes(n + d)) vals.push(n + d);
+      for (let v = n + 4; vals.length < 4; v++) if (!vals.includes(v)) vals.push(v);
+      return pack('Borders', `How many countries share a land border with ${the(c)}?`, say(n), vals.slice(1).map(say));
+    },
+    region(c) {
+      const subs = [...new Set(POOL.map(a => C[a].sub))].filter(x => x !== c.sub && SUBS[x] && !CONTS.includes(SUBS[x]));
+      const same = shuffle(subs.filter(x => POOL.some(a => C[a].sub === x && C[a].cont === c.cont))), other = shuffle(subs.filter(x => !same.includes(x)));
+      return pack('Region', `Which part of the world is ${the(c)} in?`, SUBS[c.sub], [...same, ...other].slice(0, 3).map(x => SUBS[x]));
+    },
+    most(c) {
+      // Four countries from the same part of the world with clearly different populations; the largest is the answer.
+      const near = shuffle(POOL.filter(a => a !== c.a2 && (C[a].sub === c.sub || C[a].cont === c.cont))), pick = [c.a2];
+      for (const a of [...near, ...shuffle(POOL)]) { if (pick.length >= 4) break; if (!pick.includes(a) && pick.every(b => Math.max(C[a].pop, C[b].pop) / Math.min(C[a].pop, C[b].pop) >= 1.3)) pick.push(a); }
+      const top = pick.reduce((x, y) => C[y].pop > C[x].pop ? y : x);
+      return pack('Most people', 'Which of these countries has the most people?', C[top].name, pick.filter(a => a !== top).map(a => C[a].name));
     }
   };
   function pack(label, prompt, right, wrong) {
     const options = shuffle([right, ...wrong]);
-    return { type: label.toLowerCase(), label, prompt, options, answer: options.indexOf(right), pick: null };
+    return { type: label.toLowerCase().replace(/ /g, '-'), label, prompt, options, answer: options.indexOf(right), pick: null };
   }
 
   /* ---------- Views ---------- */
@@ -2672,6 +2715,6 @@
   if (hot && hot.snapshot) hot.snapshot(() => ({ S, P, M }));
   if (hot && hot.ready) hot.ready(data => boot(data || liveSaved())); else boot((hot && hot.data) || liveSaved());
 
-  window.__fx = { revs, grandList, streaksOf, tier, plats, diams, coverHTML, showGroup, playedToday, groups, stampNote, ppLinkText, owed, timeText, dayWinners, DAY_CLOCK, DAY_CLOCK_FROM, byScore, experts, achieved, newMarks, stillMissing, passportDone, featsOn, CONT_CODES, POOL, dayText, winsTable, daysBook, dayShift, family, cloudSync, cloudState, pidOf, perfects, deck, markSeen, seenList, get match() { return M; }, standings, fitOpts, get sound() { return { ac, master, keepAlive, IOS }; }, ppPages, flagWorth, streakBonus, speedBonus, totals, entryTotal, get state() { return S; }, get player() { return P; }, get opts() { return O; }, C, POOLS, KNOWN, buildRound, tableRows, stamps, todayKey, AVATARS };
+  window.__fx = { SUBS, BONUS_MAKERS, bqSeen, revs, grandList, streaksOf, tier, plats, diams, coverHTML, showGroup, playedToday, groups, stampNote, ppLinkText, owed, timeText, dayWinners, DAY_CLOCK, DAY_CLOCK_FROM, byScore, experts, achieved, newMarks, stillMissing, passportDone, featsOn, CONT_CODES, POOL, dayText, winsTable, daysBook, dayShift, family, cloudSync, cloudState, pidOf, perfects, deck, markSeen, seenList, get match() { return M; }, standings, fitOpts, get sound() { return { ac, master, keepAlive, IOS }; }, ppPages, flagWorth, streakBonus, speedBonus, totals, entryTotal, get state() { return S; }, get player() { return P; }, get opts() { return O; }, C, POOLS, KNOWN, buildRound, tableRows, stamps, todayKey, AVATARS };
 })();
 </script>
