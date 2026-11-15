@@ -949,7 +949,9 @@
   /* The Reverse passport: see a country's name, pick its flag from four look-alikes. A game of its own, unlocked by the
      Expert passport (every country stamped), with its own 197 stamps. Its rounds earn nothing in the main passport. */
   const revs = name => store.get('fx-rev', {})[plain(name)] || [];
-  const revOpen = name => passportDone(name);
+  const NEW_FROM = '2026-11-16';                    // Reverse and Grand Explorer appear from this day, after Patrick's announcement
+  const newOn = () => todayKey() >= NEW_FROM;
+  const revOpen = name => newOn() && passportDone(name);
   function addRev(a2) { if (!revOpen(P.name)) return false; const all = store.get('fx-rev', {}), k = plain(P.name), list = all[k] || []; if (list.includes(a2)) return false; all[k] = [...list, a2]; store.set('fx-rev', all); return true; }
   const REV = { key: 'reverse', list: revs, one: 'reverse stamp', many: 'reverse stamps', goal: 'the Reverse passport', title: 'Reverse passport', label: '🔄 Reverse passport', link: '' };
   // Milestones reached, each kept with the moment it was reached: 'c0' to 'c5' for the continents, 'world', 'expert', 'platinum', 'diamond'.
@@ -977,7 +979,7 @@
      next time that player chooses a game here. */
   const cheered = name => (store.get('fx-cheered', {}) || {})[plain(name)] || [];
   const NEXT_OPEN = { world: 'lv-reverse', expert: 'lv-platinum', platinum: 'lv-diamond' };
-  function cheer(name, keys) { if (!keys.length) return; keys = [...keys, ...keys.map(k => NEXT_OPEN[k]).filter(Boolean)]; const all = store.get('fx-cheered', {}) || {}, k = plain(name); all[k] = [...new Set([...(all[k] || []), ...keys])]; store.set('fx-cheered', all); }
+  function cheer(name, keys) { if (!keys.length) return; keys = [...keys, ...keys.map(k => NEXT_OPEN[k]).filter(k => k && (k !== 'lv-reverse' || newOn()))]; const all = store.get('fx-cheered', {}) || {}, k = plain(name); all[k] = [...new Set([...(all[k] || []), ...keys])]; store.set('fx-cheered', all); }
   const owed = name => { const seen = cheered(name); return Object.keys(marks(name)).filter(k => !seen.includes(k)); };
   // The first time this version runs on a device, continents already reached count as celebrated; a full or Expert passport
   // does not, because a player who finished one before could easily have missed it.
@@ -1698,7 +1700,7 @@
           <span><b>Pass and play</b></span>
           <small>Two to eight players take turns on this device, one flag at a time.</small>
         </button>
-        ${revOpen(P.name) ? `<button type="button" class="fx-mode" data-act="opt" data-k="mode" data-v="reverse" aria-pressed="${O.mode === 'reverse'}" id="fx-mode-reverse">
+        ${!newOn() ? '' : revOpen(P.name) ? `<button type="button" class="fx-mode" data-act="opt" data-k="mode" data-v="reverse" aria-pressed="${O.mode === 'reverse'}" id="fx-mode-reverse">
           <span class="flex items-baseline justify-between gap-3"><b>🔄 Reverse</b><span class="fx-label">${revs(P.name).filter(a => C[a]).length} of ${POOL.length}</span></span>
           <small>See a country's name and pick its flag from four look-alikes. Fills your Reverse passport.</small>
         </button>` : `<div class="fx-mode fx-locked" id="fx-mode-locked" aria-disabled="true">
@@ -1759,6 +1761,7 @@
   }
   /* Grand Explorers: players who have completed every level, up to the Diamond passport, with the moment each did. */
   function grandList() {
+    if (!newOn()) return [];
     const f = family(), cache = f && store.get(gkey('fx-cloud-people', f.fid), null), out = new Map(), names = store.get('fx-people', {});
     if (cache && cache.fid === f.fid) for (const p of cache.list || []) if (p.marks && p.marks.diamond) out.set(pidOf(p.name), { name: p.name, avatar: p.avatar, t: p.marks.diamond });
     for (const [k, m] of Object.entries(store.get('fx-marks', {}) || {})) if (m && m.diamond) {
@@ -1769,7 +1772,7 @@
   }
   const crown = name => grandList().some(g => pidOf(g.name) === pidOf(name)) ? ' 👑' : '';
   const featLine = x => x.key === 'world' ? `🌍 ${x.name} stamped every country and earned the Expert passport!` : x.key === 'expert' ? `🥇 ${x.name} completed the Gold passport!`
-    : x.key === 'platinum' ? `✦ ${x.name} completed the Platinum passport!` : x.key === 'diamond' ? `💎👑 ${x.name} completed the Diamond passport and is now a Grand Explorer!`
+    : x.key === 'platinum' ? `✦ ${x.name} completed the Platinum passport!` : x.key === 'diamond' ? (newOn() ? `💎👑 ${x.name} completed the Diamond passport and is now a Grand Explorer!` : `💎 ${x.name} completed the Diamond passport!`)
     : x.key === 'reverse' ? `🔄 ${x.name} completed the Reverse passport!` : `🗺️ ${x.name} completed ${CONTS[+x.key.slice(1)]}!`;
   function dayText(date, book = daysBook()) {
     const rows = [...(book.get(date) || [])].sort(byScore), won = dayWinners(rows);
@@ -2276,7 +2279,7 @@
       <p>You know every country, not just its flag.</p>
       <p><b class="font-semibold">Next, the Diamond passport:</b> name a flag with no hints in ${DIAMOND_SECS} seconds or less for a diamond.</p></div>`;
     if (key === 'diamond') return `<div class="fx-feat big" id="fx-feat-diamond"><p class="fx-label">Every flag in ${DIAMOND_SECS} seconds</p><h2>💎 Diamond passport complete</h2>
-      <p>Every level of the passport is complete. You are now a <b>Grand Explorer</b> 👑.</p></div>`;
+      <p>Every level of the passport is complete.${newOn() ? ' You are now a <b>Grand Explorer</b> 👑.' : ''}</p></div>`;
     if (key === 'reverse') return `<div class="fx-feat big" id="fx-feat-reverse"><p class="fx-label">The flag of every country</p><h2>🔄 Reverse passport complete</h2>
       <p>You found the flag of all ${POOL.length} countries from their names alone.</p></div>`;
     const ci = +key.slice(1);
@@ -2293,7 +2296,9 @@
     const n = (list, one) => list.length ? plural(list.length, one) : '';
     let body;
     if (keys.includes('diamond')) { const hall = grandList(), place = hall.findIndex(g => pidOf(g.name) === pidOf(P.name)) + 1;
-      body = `${cover(4)}<p class="fx-label">Every flag in ${DIAMOND_SECS} seconds</p><h2 id="fx-cheer-h">👑 Grand Explorer!</h2>
+      if (!newOn()) body = `${cover(4)}<p class="fx-label">Every flag in ${DIAMOND_SECS} seconds</p><h2 id="fx-cheer-h">Diamond passport!</h2>
+      <p>${name}, you have named all ${POOL.length} flags, with no hints, in ${DIAMOND_SECS} seconds or less. Every level is done: Expert, Gold, Platinum and Diamond.</p>${buttons('See my Diamond passport')}`;
+      else body = `${cover(4)}<p class="fx-label">Every flag in ${DIAMOND_SECS} seconds</p><h2 id="fx-cheer-h">👑 Grand Explorer!</h2>
       <p>${name}, you have completed the Diamond passport: all ${POOL.length} flags, with no hints, in ${DIAMOND_SECS} seconds or less. Every level is done: Expert, Gold, Platinum and Diamond.</p>
       ${next('👑 Your new title', `You are now a <b>Grand Explorer</b>. A crown goes beside your name on every scoreboard${place ? `, and you are <b>${place === 1 ? 'the first' : ordinal(place)}</b> in the Hall of Fame` : ''}.`)}${buttons('See my Diamond passport')}`; }
     else if (keys.includes('reverse')) body = `${revCover()}<p class="fx-label">The flag of every country</p><h2 id="fx-cheer-h">Reverse passport!</h2>
@@ -2313,7 +2318,7 @@
     else if (keys.includes('world')) body = `${cover(1)}<p class="fx-label">Every country in the world</p><h2 id="fx-cheer-h">Expert passport!</h2>
       <p>${name}, you have stamped all ${POOL.length} countries. Your passport is complete and has its Expert cover.</p>
       ${next(`What's next: the Gold passport`, `Every flag you name with <b>no hints</b> now earns a gold star on its stamp. Star all ${POOL.length} to complete it.`, n(experts(P.name), 'gold star'))}
-      ${next('🔄 Unlocked: Reverse', `A new way to play, next to Free play: see a country's name and pick its flag from four look-alikes. It has a passport of its own.`)}${buttons('See my Expert passport')}`;
+      ${newOn() ? next('🔄 Unlocked: Reverse', `A new way to play, next to Free play: see a country's name and pick its flag from four look-alikes. It has a passport of its own.`) : ''}${buttons('See my Expert passport')}`;
     else { const names = keys.map(k => CONTS[+k.slice(1)]), flags = keys.reduce((n, k) => n + CONT_CODES[+k.slice(1)].length, 0), have = stamps(P.name).filter(a => C[a]).length;
       body = `${cover(0)}<p class="fx-label">Passport milestone</p><h2 id="fx-cheer-h">🗺️ ${listOf(names)} complete</h2>
       <p>${name}, every one of ${keys.length > 1 ? `their ${flags}` : `its ${flags}`} flags is stamped in your passport. ${have} of ${POOL.length} countries so far; stamp them all for the Expert passport.</p>${buttons('See my passport')}`; }

@@ -6,11 +6,11 @@ const url = 'file://' + path.resolve('test.html');
 const mock = await startMock();
 const browser = await chromium.launch({ executablePath: process.env.FX_CHROMIUM || '/opt/pw-browsers/chromium' });
 const errors = [], assert = (c, m) => { if (!c) errors.push('ASSERT ' + m); }, eq = (a, b, m) => assert(a === b, `${m}: expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`);
-async function mk(label, { cloud = false, width = 390 } = {}) {
+async function mk(label, { cloud = false, width = 390, time = '2026-10-13T12:00:00' } = {}) {
   const ctx = await browser.newContext({ viewport: { width, height: 844 }, deviceScaleFactor: 2 }), p = await ctx.newPage();
   p.on('pageerror', e => errors.push(`pageerror(${label}) ${e.message}`)); p.on('console', m => { if (m.type() === 'error' && !m.text().includes('404')) errors.push(`console(${label}) ${m.text()}`); });       // a 404 is the database saying a player does not exist yet
   if (cloud) await p.addInitScript(cfg => { window.FX_CLOUD = cfg; }, { projectId: 'demo', apiKey: 'test-key', base: mock.base });
-  await p.clock.install({ time: new Date('2026-10-13T12:00:00') });      // the day summaries below are for 11 and 12 October, so the test lives on the 13th
+  await p.clock.install({ time: new Date(time) });      // the day summaries below are for 11 and 12 October, so the test lives on the 13th
   await p.goto(url); await p.waitForTimeout(250); return p;
 }
 const st = p => p.evaluate(() => JSON.parse(JSON.stringify(window.__fx.state)));
@@ -165,7 +165,7 @@ await M2.click('[data-act=choose]'); await round(M2); eq(await M2.locator('#fx-p
 
 // ---- 8. Platinum and Diamond
 // a player who finished the Expert passport before this version is told about the new level once, and sees the Expert cover
-const P2 = await mk('P2'); const tP = Date.now() - 3 * 864e5;
+const P2 = await mk('P2', { time: '2026-11-20T12:00:00' }); const tP = new Date('2026-11-17T12:00:00').getTime();       // after Reverse and Grand Explorer appear on 16 November
 await seed(P2, { 'fx-passport': { boo: POOL }, 'fx-expert': { boo: POOL }, 'fx-marks': { boo: { c0: tP, c1: tP, c2: tP, c3: tP, c4: tP, c5: tP, world: tP, expert: tP } },
   'fx-cheered': { boo: ['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'world', 'expert', 'lv-reverse'] }, 'fx-people': { boo: { name: 'Boo', avatar: '🤓' } } }); await P2.reload(); await P2.waitForTimeout(250);
 eq(await fx(P2, 'tier', 'Boo'), 2, 'Expert complete: working on Platinum');
@@ -223,11 +223,16 @@ assert((await txt(P2, '.fx-hrow')).includes('👑'), 'the crown beside her name 
 await P2.click('[data-act=tab][data-v=wins]'); await P2.waitForSelector('#fx-hall'); assert((await txt(P2, '#fx-hall')).includes('Boo') && (await txt(P2, '#fx-hall')).includes('1st'), 'the Hall of Fame lists her first');
 await P2.screenshot({ path: 'p19-hall.png', fullPage: true }); await overflow(P2, 'hall of fame');
 
-// ---- 9. Reverse: locked until the Expert passport, then a game of its own with its own passport
-const V = await mk('V'); await seed(V, { 'fx-passport': { casey: POOL.slice(0, 150) }, 'fx-people': { casey: { name: 'Casey', avatar: '🦊' } } }); await V.reload(); await V.waitForTimeout(250);
+// ---- 9. Reverse: not shown before 16 November; locked until the Expert passport, then a game of its own with its own passport
+const U = await mk('U', { time: '2026-11-15T20:00:00' }); await seed(U, { 'fx-passport': { robin: POOL }, 'fx-cheered': { robin: ['world'] }, 'fx-people': { robin: { name: 'Robin', avatar: '🐙' } } }); await U.reload(); await U.waitForTimeout(250);
+await enter(U, 'Robin'); eq(await U.locator('#fx-mode-reverse, #fx-mode-locked, #fx-cheer').count(), 0, 'on 15 November there is no Reverse yet, and no announcement');
+await U.clock.setFixedTime(new Date('2026-11-16T07:00:00')); await U.click('[data-act=rules-back]'); await enter(U, 'Robin'); await U.waitForSelector('#fx-cheer');
+assert((await txt(U, '#fx-cheer')).includes('New: Reverse'), 'on the morning of the 16th it is announced'); await U.click('[data-act=cheer-close]'); eq(await U.locator('#fx-mode-reverse').count(), 1, 'and can be chosen');
+
+const V = await mk('V', { time: '2026-11-20T12:00:00' }); await seed(V, { 'fx-passport': { casey: POOL.slice(0, 150) }, 'fx-people': { casey: { name: 'Casey', avatar: '🦊' } } }); await V.reload(); await V.waitForTimeout(250);
 await enter(V, 'Casey'); eq(await V.locator('#fx-mode-locked').count(), 1, 'Reverse shows as locked'); assert((await txt(V, '#fx-mode-locked')).includes('47 stamps to go'), 'with the stamps still needed');
 eq(await V.locator('#fx-mode-reverse').count(), 0, 'and cannot be chosen'); await V.screenshot({ path: 'p20-reverse-locked.png', fullPage: true });
-const W2 = await mk('W2'); const tE = Date.now() - 864e5;
+const W2 = await mk('W2', { time: '2026-11-20T12:00:00' }); const tE = Date.now() - 864e5;
 await seed(W2, { 'fx-passport': { robin: POOL }, 'fx-expert': { robin: POOL.slice(0, 20) }, 'fx-marks': { robin: { c0: tE, c1: tE, c2: tE, c3: tE, c4: tE, c5: tE, world: tE } }, 'fx-cheered': { robin: ['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'world'] }, 'fx-people': { robin: { name: 'Robin', avatar: '🐙' } } });
 await W2.reload(); await W2.waitForTimeout(250); await enter(W2, 'Robin'); await W2.waitForSelector('#fx-cheer');
 assert((await txt(W2, '#fx-cheer')).includes('New: Reverse'), 'a player who already had the Expert passport is told Reverse is open'); eq(await W2.locator('#fx-cheer .pp-cover.reverse').count(), 1, 'with the Reverse cover');
@@ -259,7 +264,7 @@ for (let k = 1; k <= 10; k++) { if ((await st(W2)).q.phase === 'wager') await W2
 await W2.waitForTimeout(200); rs = await st(W2); assert(rs.round.some(r => r.a2 === last), 'the last missing flag is dealt'); eq(JSON.stringify(rs.feats), '["reverse"]', 'the Reverse passport completes');
 assert((await txt(W2, '#fx-cheer')).includes('Reverse passport!'), 'and is celebrated'); await W2.waitForTimeout(600); await W2.screenshot({ path: 'p25-reverse-done.png' });
 // reverse stamps travel with the player through the family
-const X2 = await mk('X2', { cloud: true }); await seed(X2, { 'fx-passport': { morgan: POOL }, 'fx-rev': { morgan: POOL.slice(0, 33) }, 'fx-cheered': { morgan: ['lv-reverse', 'world'] }, 'fx-people': { morgan: { name: 'Morgan', avatar: '🐢' } } });
+const X2 = await mk('X2', { cloud: true, time: '2026-11-20T12:00:00' }); await seed(X2, { 'fx-passport': { morgan: POOL }, 'fx-rev': { morgan: POOL.slice(0, 33) }, 'fx-cheered': { morgan: ['lv-reverse', 'world'] }, 'fx-people': { morgan: { name: 'Morgan', avatar: '🐢' } } });
 await X2.reload(); await X2.waitForTimeout(250); await join(X2, 'reverse-family'); await enter(X2, 'Morgan'); await X2.evaluate(() => window.__fx.cloudSync()); await X2.waitForFunction(() => !window.__fx.cloudState.busy);
 const xfid = (await X2.evaluate(() => window.__fx.family())).fid; eq(mock.plain(mock.docs.get(`families/${xfid}/players/morgan`)).perfect.filter(c => c.startsWith('r|')).length, 33, 'reverse stamps reach the family');
 
