@@ -122,7 +122,7 @@
   }
   .fx-caption { font-family: var(--font-body); font-weight: 600; font-size: 1.1rem; text-align: center; line-height: 1.25; min-height: 1.35em; text-wrap: balance; }
   .fx-caption.named { font-family: var(--font-display); font-weight: 700; font-size: 1.9rem; line-height: 1; text-transform: uppercase; letter-spacing: .04em; }
-  .fx-thumb { width: 2.25rem; height: 1.5rem; object-fit: contain; flex: none; filter: drop-shadow(0 0 .6px var(--flag-edge)); }
+  .fx-thumb { width: 2.25rem; height: 1.5rem; object-fit: contain; flex: none; filter: drop-shadow(0 0 .8px var(--flag-edge)) drop-shadow(0 0 .4px var(--flag-edge)); }
   .fx-perf { position: relative; height: 0; margin: 1rem calc(14px - var(--px)) 0; border-top: 2px dashed var(--rule); }
   .fx-perf::before, .fx-perf::after { content: ''; position: absolute; top: -11px; width: 20px; height: 20px; border-radius: 50%; background: var(--paper); }
   .fx-perf::before { left: -24px; }
@@ -226,7 +226,8 @@
   .fx-plate.rev-ask .fx-flag { visibility: hidden; }
   .fx-optflag { align-items: center; }
   .fx-optimg { display: flex; flex-direction: column; align-items: center; gap: .25rem; min-width: 0; flex: 1; }
-  .fx-optimg img { width: 100%; max-width: 7.5rem; height: 3.6rem; object-fit: contain; border-radius: 4px; }
+  /* an outline that follows the flag itself, so white bands show against the white button */
+  .fx-optimg img { width: 100%; max-width: 7.5rem; height: 3.6rem; object-fit: contain; filter: drop-shadow(0 0 1px rgba(20, 30, 55, .75)) drop-shadow(0 0 .5px rgba(20, 30, 55, .6)); }
   .fx-optimg small { font-size: .78rem; line-height: 1.15; text-align: center; }
   .fx-locked { opacity: .78; cursor: default; border-style: dashed; }
   .fx-locked::before { visibility: hidden; }
