@@ -46,10 +46,10 @@ service cloud.firestore {
         allow delete: if false;
       }
 
-      // High scores: one document per finished round, in the Whole world or Well-known table.
+      // High scores: one document per finished round, in the Whole world, Well-known or Reverse table.
       match /tables/{table}/entries/{entry} {
-        allow get, list: if goodFamily() && table in ['world', 'known'];
-        allow create: if goodFamily() && table in ['world', 'known'] && goodScore(request.resource.data);
+        allow get, list: if goodFamily() && table in ['world', 'known', 'reverse'];
+        allow create: if goodFamily() && table in ['world', 'known', 'reverse'] && goodScore(request.resource.data);
         allow update, delete: if false;
       }
 

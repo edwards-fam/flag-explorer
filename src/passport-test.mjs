@@ -8,7 +8,7 @@ const browser = await chromium.launch({ executablePath: process.env.FX_CHROMIUM 
 const errors = [], assert = (c, m) => { if (!c) errors.push('ASSERT ' + m); }, eq = (a, b, m) => assert(a === b, `${m}: expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`);
 async function mk(label, { cloud = false, width = 390, time = '2026-10-13T12:00:00' } = {}) {
   const ctx = await browser.newContext({ viewport: { width, height: 844 }, deviceScaleFactor: 2 }), p = await ctx.newPage();
-  p.on('pageerror', e => errors.push(`pageerror(${label}) ${e.message}`)); p.on('console', m => { if (m.type() === 'error' && !m.text().includes('404')) errors.push(`console(${label}) ${m.text()}`); });       // a 404 is the database saying a player does not exist yet
+  p.on('pageerror', e => errors.push(`pageerror(${label}) ${e.message}`)); p.on('console', m => { if (m.type() === 'error' && !m.text().includes('404') && !(mock.state.oldRules && m.text().includes('403'))) errors.push(`console(${label}) ${m.text()}`); });       // a 404 is the database saying a player does not exist yet
   if (cloud) await p.addInitScript(cfg => { window.FX_CLOUD = cfg; }, { projectId: 'demo', apiKey: 'test-key', base: mock.base });
   await p.clock.install({ time: new Date(time) });      // the day summaries below are for 11 and 12 October, so the test lives on the 13th
   await p.goto(url); await p.waitForTimeout(250); return p;
@@ -256,7 +256,13 @@ assert((await txt(W2, '#fx-pstrip')).includes('10 new reverse stamps') && (await
 eq(await W2.locator('#fx-log .fx-new.rev').count(), 10, 'each marked beside its flag'); await W2.screenshot({ path: 'p24-reverse-end.png', fullPage: true });
 await W2.click('#fx-pstrip'); eq(await W2.locator('.pp-cover.reverse').count(), 1, 'the strip opens the Reverse passport'); assert(/10\s*of 197 found/.test(await txt(W2, '.fx-band')), 'counting what was found');
 await W2.click('[data-act=ppbook][data-v=world]'); eq(await W2.locator('.pp-cover.expert').count(), 1, 'and switches to the main passport'); await W2.click('[data-act=back]');
+await W2.click('[data-act=board]'); eq(await W2.locator('[data-act=tab][data-v=reverse][aria-pressed=true]').count(), 1, 'High scores opens on the Reverse table'); eq(await W2.locator('.fx-hrow:not(.empty)').count(), 1, 'with the round in it');
+assert((await txt(W2, '.fx-band')).includes('Reverse'), 'named in the heading'); await W2.screenshot({ path: 'p26-reverse-board.png', fullPage: true }); await overflow(W2, 'reverse board'); await W2.click('[data-act=back]');
 await W2.click('[data-act=again]'); eq((await st(W2)).reverse, true, 'Play again stays in Reverse');
+// the final flag: the country stays sealed until the wager is decided
+for (let k = 1; k <= 9; k++) { await pickFlag(W2, true); await W2.click('[data-act=bonus]'); await pickBonus(W2, true); await W2.click('[data-act=next]'); }
+eq((await st(W2)).q.phase, 'wager', 'the wager comes before the last flag'); eq(await W2.locator('#fx-revname').isVisible(), false, 'the country is not named during the wager'); eq(await W2.locator('.fx-seal').isVisible(), true, 'the seal shows instead');
+await W2.screenshot({ path: 'p27-reverse-wager.png' }); await W2.click('[data-act=wager][data-v="0"]'); eq(await W2.locator('#fx-revname').isVisible(), true, 'and is named once the wager is decided');
 // the last reverse stamp completes it
 await W2.click('[data-act=end-early]'); await W2.click('[data-act=end-early]'); const last = POOL[42];
 await seed(W2, { 'fx-rev': { robin: POOL.filter(a => a !== last) } }); await W2.click('[data-act=choose]'); await W2.click('#fx-mode-reverse'); await W2.click('[data-act=play]');
@@ -266,7 +272,15 @@ assert((await txt(W2, '#fx-cheer')).includes('Reverse passport!'), 'and is celeb
 // reverse stamps travel with the player through the family
 const X2 = await mk('X2', { cloud: true, time: '2026-11-20T12:00:00' }); await seed(X2, { 'fx-passport': { morgan: POOL }, 'fx-rev': { morgan: POOL.slice(0, 33) }, 'fx-cheered': { morgan: ['lv-reverse', 'world'] }, 'fx-people': { morgan: { name: 'Morgan', avatar: '🐢' } } });
 await X2.reload(); await X2.waitForTimeout(250); await join(X2, 'reverse-family'); await enter(X2, 'Morgan'); await X2.evaluate(() => window.__fx.cloudSync()); await X2.waitForFunction(() => !window.__fx.cloudState.busy);
-const xfid = (await X2.evaluate(() => window.__fx.family())).fid; eq(mock.plain(mock.docs.get(`families/${xfid}/players/morgan`)).perfect.filter(c => c.startsWith('r|')).length, 33, 'reverse stamps reach the family');
+const xfid = (await X2.evaluate(() => window.__fx.family())).fid;
+// Reverse scores are shared with the family; a scoreboard on the old rules keeps them on the device with no problem shown
+mock.state.oldRules = true; if (await X2.locator('#fx-cheer').count()) await X2.click('[data-act=cheer-close]'); if ((await st(X2)).screen !== 'rules') await X2.click('[data-act=back]').catch(() => {}); await X2.click('#fx-mode-reverse'); await X2.click('[data-act=play]');
+for (let k = 1; k <= 10; k++) { if ((await st(X2)).q.phase === 'wager') await X2.click('[data-act=wager][data-v="0"]'); await pickFlag(X2, true); await X2.click('[data-act=bonus]'); await pickBonus(X2, true); await X2.click('[data-act=next]'); }
+await X2.waitForFunction(() => !window.__fx.cloudState.busy); await X2.waitForTimeout(100);
+const revDocs = () => [...mock.docs.keys()].filter(k => k.startsWith(`families/${xfid}/tables/reverse/entries/`)).length;
+eq(revDocs(), 0, 'old rules: nothing saved'); eq(await X2.evaluate(() => window.__fx.cloudState.problems.length), 0, 'and no problem shown'); eq(await X2.evaluate(() => window.__fx.cloudState.ok), true, 'the scoreboard still counts as reached');
+eq(await X2.evaluate(() => window.__fx.tableRows('reverse').length), 1, 'the device shows its own Reverse score meanwhile');
+mock.state.oldRules = false; await X2.evaluate(() => window.__fx.cloudSync()); await X2.waitForFunction(() => !window.__fx.cloudState.busy); eq(revDocs(), 1, 'once the rules are updated, the score goes up'); assert(mock.plain(mock.docs.get(`families/${xfid}/players/morgan`)).perfect.filter(c => c.startsWith('r|')).length >= 33, 'reverse stamps reach the family');
 
 await browser.close(); mock.close();
 console.log(errors.length ? errors.join('\n') : 'PASSPORT CHECKS PASSED');

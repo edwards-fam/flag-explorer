@@ -1096,7 +1096,7 @@
     const sent = kept('fx-synced', f), done = new Set(sent.ids || []), todo = [], tables = store.get('fx-tables', {}), d = dailyData();
     // a group gets the scores played since this device joined it (and Today's challenge on the day it joined), not older ones
     const since = f.since || 0, from = dayKey(new Date(since));
-    for (const table of ['world', 'known']) for (const r of tables[table] || []) if (r && r.name && r.t && r.t >= since && r.score > 0) todo.push([`${table}/${rowKey(r)}`, `tables/${table}/entries/${pidOf(r.name)}_${r.t}`, r]);
+    for (const table of ['world', 'known', 'reverse']) for (const r of tables[table] || []) if (r && r.name && r.t && r.t >= since && r.score > 0) todo.push([`${table}/${rowKey(r)}`, `tables/${table}/entries/${pidOf(r.name)}_${r.t}`, r]);
     for (const r of d.rows) if (r && r.name && r.t && !r.cloud) todo.push([`days/${d.date}/${pidOf(r.name)}`, `days/${d.date}/entries/${pidOf(r.name)}`, r]);
     // a challenge played with no connection is still sent for a few days afterwards, so it counts towards that day's win
     const own = store.get('fx-days', {});
@@ -1111,7 +1111,7 @@
         else try { await send({ ms: r.ms }); }
         catch (e) { if (e.status !== 403) throw e; await send({}); }        // a scoreboard whose rules predate the clock still takes the score, without its time
       }
-      catch (e) { if (!e.status) throw e; refused = refused || e; continue; }       // one refused score must not hold back the others
+      catch (e) { if (!e.status) throw e; if (!id.startsWith('reverse/')) refused = refused || e; continue; }       // one refused score must not hold back the others; a scoreboard whose rules predate the Reverse table keeps those scores for later
       done.add(id); store.set(gkey('fx-synced', f.fid), { fid: f.fid, ids: [...done].slice(-600) });
     }
     if (refused) throw refused;
@@ -1187,8 +1187,10 @@
   const okRow = r => r && typeof r.name === 'string' && r.name && Number.isFinite(r.score) && Number.isFinite(r.t);
   async function pullTables(f) {
     const cache = { fid: f.fid, at: Date.now() };
-    for (const table of ['world', 'known']) {
-      const res = await fsGet(`families/${f.fid}/tables/${table}/entries?pageSize=10&orderBy=${encodeURIComponent('score desc')}`);
+    for (const table of ['world', 'known', 'reverse']) {
+      let res = null;
+      try { res = await fsGet(`families/${f.fid}/tables/${table}/entries?pageSize=10&orderBy=${encodeURIComponent('score desc')}`); }
+      catch (e) { if (table !== 'reverse' || !e.status) throw e; }        // rules from before the Reverse table: this device's own Reverse scores are shown meanwhile
       cache[table] = ((res && res.documents) || []).map(fsDoc).filter(okRow);
     }
     const day = todayKey(), res = await fsGet(`families/${f.fid}/days/${day}/entries?pageSize=60`);
@@ -1908,7 +1910,7 @@
         <span class="fx-num text-lg">${r ? fmt(r.score) : ''}</span>
       </li>`;
     }).join('');
-    const sub = wins ? 'Daily wins' : tab === 'daily' ? `Today's challenge · ${todayLabel()}` : POOLS[tab].label;
+    const sub = wins ? 'Daily wins' : tab === 'daily' ? `Today's challenge · ${todayLabel()}` : tab === 'reverse' ? 'Reverse' : POOLS[tab].label;
     const foot = mine >= 0 ? `${esc(P.name)} takes ${ORD[mine]} place.`
       : list.length ? (tab === 'daily' ? `The top score at midnight wins the day${dayTimed() ? '; level on points, the faster time' : ''}.` : 'Beat a score here to enter the table.')
       : tab === 'daily' ? 'Nobody has played today yet.' : 'No scores yet. Finish a round to enter the table.';
@@ -1922,7 +1924,7 @@
         </div>
       </div>
       ${many() ? `<div class="flex flex-wrap gap-2 mb-3" role="group" aria-label="Which group" id="fx-group-pick">${groups().map(g => `<button type="button" class="fx-pick fx-gpick" data-act="group" data-v="${g.fid}" aria-pressed="${g.fid === family().fid}">${esc(g.name)}</button>`).join('')}</div>` : ''}
-      <div class="grid grid-cols-2 gap-2" role="group" aria-label="Which table">${tabBtn('world', 'Whole world')}${tabBtn('known', 'Well-known')}${tabBtn('daily', 'Today')}${tabBtn('wins', 'Daily wins')}</div>
+      <div class="grid grid-cols-2 gap-2" role="group" aria-label="Which table">${tabBtn('world', 'Whole world')}${tabBtn('known', 'Well-known')}${tabBtn('daily', 'Today')}${tabBtn('wins', 'Daily wins')}${newOn() ? `<button type="button" class="fx-pick" style="grid-column:1 / -1" data-act="tab" data-v="reverse" aria-pressed="${tab === 'reverse'}">🔄 Reverse</button>` : ''}</div>
       ${wins ? viewWins() : `<div class="fx-hhead fx-label mt-5" aria-hidden="true"><span>Rank</span><span style="width:2.1rem"></span><span>Explorer</span><span>Score</span></div>
       <ol>${rows}</ol>
       <p class="font-script text-lg text-center mt-4">${foot}</p>
@@ -2115,7 +2117,7 @@
       <div class="fx-flagbox">
         <img class="fx-flag" style="--ar:${c.ar}" data-flag="${q.a2}" alt="${S.reverse ? 'The flag of ' + esc(c.name) : 'The flag to identify'}">
         <div class="fx-seal">${COMPASS(56)}<span class="fx-label">Sealed until you decide</span></div>
-        ${S.reverse ? `<div class="fx-revname"><span class="fx-label">Find the flag of</span><b>${esc(c.name)}</b></div>` : ''}
+        ${S.reverse ? `<div class="fx-revname" id="fx-revname"><span class="fx-label">Find the flag of</span><b>${esc(c.name)}</b></div>` : ''}
       </div>
       <figcaption class="fx-caption" id="fx-cap"></figcaption>
     </figure>
@@ -2539,7 +2541,7 @@
       if (plate.dataset.key !== S.i + q.a2) { plate.innerHTML = viewPlate(); plate.dataset.key = S.i + q.a2; }
       const sealed = q.phase === 'wager', revealed = !sealed && q.phase !== 'guess', cap = app.querySelector('#fx-cap');
       plate.firstElementChild.classList.toggle('sealed', sealed);
-      plate.firstElementChild.classList.toggle('rev-ask', !!S.reverse && !revealed);
+      plate.firstElementChild.classList.toggle('rev-ask', !!S.reverse && !revealed && !sealed);      // the name is the thing kept sealed during the wager
       cap.textContent = sealed ? 'The final flag' : revealed ? c.name : S.reverse ? 'Which of these is its flag?' : 'Which country flies this flag?';
       cap.classList.toggle('named', revealed);
       app.querySelector('#fx-pos').textContent = revealed ? coords(c) : sealed ? 'Final flag' : 'Destination unknown';

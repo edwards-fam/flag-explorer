@@ -19,7 +19,7 @@ export function startMock() {
     const seg = path.split('/');
     if (seg[0] !== 'families' || !/^[0-9a-f]{32}$/.test(seg[1] || '')) return null;
     if (seg.length === 4 && seg[2] === 'players') return { read: true, create: goodPlayer, update: goodPlayer };
-    if (seg.length === 6 && seg[2] === 'tables' && ['world', 'known'].includes(seg[3]) && seg[4] === 'entries') return { read: true, create: goodScore, update: null };
+    if (seg.length === 6 && seg[2] === 'tables' && (['world', 'known'].includes(seg[3]) || (seg[3] === 'reverse' && !state.oldRules)) && seg[4] === 'entries') return { read: true, create: goodScore, update: null };
     if (seg.length === 6 && seg[2] === 'days' && /^\d{4}-\d{2}-\d{2}$/.test(seg[3]) && seg[4] === 'entries') return { read: true, create: goodScore, update: null };
     return null;
   }
