@@ -1266,6 +1266,7 @@
   /* Bonus questions. From BQ_FROM there are eight kinds instead of four, wrong answers vary more, and a player is not given
      the kind of question they last had for a country (Today's challenge keeps one set of questions for everyone). */
   const BQ_FROM = '2026-11-19';
+  const CAPOF_FROM = '2026-11-20';                 // the capital question the other way round asks about a neighbour from this day
   const bqOn = () => todayKey() >= BQ_FROM;
   const OLD_KINDS = ['capital', 'continent', 'population', 'neighbour'];
   const bqSeen = name => (store.get('fx-bq', {}) || {})[plain(name)] || {};
@@ -1287,7 +1288,7 @@
       // for this country are passed over while another will do.
       const on = bqOn();
       const can = { capital: on ? capOK(c) || a2 === 'BO' : capOK(c), continent: !NO_CONT_Q.has(a2), population: true, neighbour: c.borders.length > 0,
-        capitalOf: capOK(c) || a2 === 'BO', borders: true, region: !!SUBS[c.sub] && !CONTS.includes(SUBS[c.sub]), most: true };
+        capitalOf: todayKey() >= CAPOF_FROM || capOK(c) || a2 === 'BO', borders: true, region: !!SUBS[c.sub] && !CONTS.includes(SUBS[c.sub]), most: true };
       const ok = t => kinds.includes(t) && can[t], last = (seen[a2] || []).slice(-2), fresh = t => ok(t) && !last.includes(t);
       let k = bag.findIndex(fresh);
       if (k < 0) k = bag.findIndex(ok);
@@ -1542,9 +1543,18 @@
     },
     // From 19 November: the capital the other way round, how many neighbours, the region, and who has the most people.
     capitalOf(c) {
-      const wrong = [], add = a => { if (a !== c.a2 && !wrong.includes(a) && wrong.length < 3) wrong.push(a); };
-      [...shuffle(c.borders), ...shuffle(POOL.filter(a => C[a].sub === c.sub)), ...shuffle(POOL.filter(a => C[a].cont === c.cont))].forEach(add);
-      return pack('Capital city', `${c.cap} is the capital of which country?`, c.name, wrong.map(a => C[a].name));
+      // The flag has just been named, so asking for its own capital's country would answer itself. Until CAPOF_FROM it did
+      // (kept so a day's challenge stays the same for everyone); from then on the capital is a neighbour's, or a nearby country's.
+      if (todayKey() < CAPOF_FROM) {
+        const wrong = [], add = a => { if (a !== c.a2 && !wrong.includes(a) && wrong.length < 3) wrong.push(a); };
+        [...shuffle(c.borders), ...shuffle(POOL.filter(a => C[a].sub === c.sub)), ...shuffle(POOL.filter(a => C[a].cont === c.cont))].forEach(add);
+        return pack('Capital city', `${c.cap} is the capital of which country?`, c.name, wrong.map(a => C[a].name));
+      }
+      const ok = a => a !== c.a2 && capOK(C[a]);
+      const next = shuffle(c.borders.filter(ok)), t = next[0] || shuffle(POOL.filter(a => ok(a) && C[a].sub === c.sub))[0] || shuffle(POOL.filter(a => ok(a) && C[a].cont === c.cont))[0];
+      const wrong = [], add = a => { if (a !== c.a2 && a !== t && !wrong.includes(a) && wrong.length < 3) wrong.push(a); };
+      [...shuffle(c.borders), ...shuffle(C[t].borders), ...shuffle(POOL.filter(a => C[a].sub === C[t].sub)), ...shuffle(POOL.filter(a => C[a].cont === C[t].cont))].forEach(add);
+      return pack('Capital city', next.length ? `${C[t].cap} is the capital of which neighbour of ${the(c)}?` : `Not far from ${the(c)}: ${C[t].cap} is the capital of which country?`, C[t].name, wrong.map(a => C[a].name));
     },
     borders(c) {
       const n = c.borders.length, say = v => v === 0 ? 'None' : v === 1 ? '1 country' : `${v} countries`, vals = [n];

@@ -17,7 +17,7 @@ const before = await A.evaluate(() => { const f = window.__fx, kinds = new Set()
 eq(JSON.stringify(before), JSON.stringify(['capital', 'continent', 'neighbour', 'population']), 'four kinds before 19 November');
 
 // ---- 2. from the 19th: eight kinds, each sound for every country it can be asked about
-const B = await page('2026-11-19');
+const B = await page('2026-11-20');
 const after = await B.evaluate(() => { const f = window.__fx, kinds = new Set(); for (let i = 0; i < 120; i++) f.buildRound(f.deck(f.POOL, 10).slice(0, 10), 'Alex').forEach(r => kinds.add(r.bonus.kind)); return [...kinds].sort(); });
 eq(JSON.stringify(after), JSON.stringify(['borders', 'capital', 'capitalOf', 'continent', 'most', 'neighbour', 'population', 'region']), 'eight kinds from 19 November');
 const bad = await B.evaluate(() => {
@@ -30,13 +30,18 @@ const bad = await B.evaluate(() => {
       if (q.options.length !== 4 || new Set(q.options).size !== 4 || q.answer < 0) { out.push(`${a} ${kind}: options ${JSON.stringify(q.options)}`); break; }
       if (kind === 'borders' && right !== (c.borders.length === 0 ? 'None' : c.borders.length === 1 ? '1 country' : `${c.borders.length} countries`)) out.push(`${a} borders: ${right}`);
       if (kind === 'region' && (right !== f.SUBS[c.sub] || q.options.some(o => typeof o !== 'string' || /^\d+$/.test(o)))) out.push(`${a} region: ${JSON.stringify(q.options)}`);
-      if (kind === 'capitalOf' && right !== c.name) out.push(`${a} capitalOf: ${right}`);
+      if (kind === 'capitalOf') { const t = f.POOL.map(x => C[x]).find(x => x.name === right); if (!t || t.a2 === a || q.options.includes(c.name) || !q.prompt.startsWith(t.cap + ' is') && !q.prompt.includes(': ' + t.cap + ' is')) out.push(`${a} capitalOf: ${q.prompt} ${JSON.stringify(q.options)}`); if (c.borders.length && q.prompt.includes('neighbour') && !c.borders.includes(t.a2)) out.push(`${a} capitalOf: ${right} is not a neighbour`); }
       if (kind === 'most') { const pops = q.options.map(nm => f.POOL.map(x => C[x]).find(x => x.name === nm).pop); if (Math.max(...pops) !== pops[q.answer]) out.push(`${a} most: ${right}`); }
     }
   }
   return out.slice(0, 10);
 });
 eq(bad.join(' | '), '', 'every question has four different answers and the right one');
+// on the 19th itself the question was still about the flag's own country, so that day's challenge stays the same for everyone
+const B0 = await page('2026-11-19'); const old = await B0.evaluate(() => { const q = window.__fx.BONUS_MAKERS.capitalOf(window.__fx.C.BE); return q.options[q.answer]; }); eq(old, 'Belgium', 'unchanged on 19 November');
+const be = await B.evaluate(() => { const q = window.__fx.BONUS_MAKERS.capitalOf(window.__fx.C.BE); return { p: q.prompt, o: q.options, r: q.options[q.answer] }; });
+assert(be.p.endsWith('is the capital of which neighbour of Belgium?') && !be.o.includes('Belgium') && ['France', 'Germany', 'Netherlands', 'Luxembourg'].includes(be.r), 'from the 20th, Belgium is asked about a neighbour’s capital: ' + JSON.stringify(be));
+const fj = await B.evaluate(() => window.__fx.BONUS_MAKERS.capitalOf(window.__fx.C.FJ).prompt); assert(fj.startsWith('Not far from Fiji: '), 'an island is asked about a nearby country: ' + fj);
 // the gaps closed: Bolivia gets its capital, Egypt its region
 const gaps = await B.evaluate(() => { const f = window.__fx, n = { BO: new Set(), EG: new Set() }; for (let i = 0; i < 300; i++) for (const a of ['BO', 'EG']) n[a].add(f.buildRound([a]).find(r => r.a2 === a).bonus.kind); return { BO: [...n.BO], EG: [...n.EG] }; });
 assert(gaps.BO.includes('capital') && gaps.BO.includes('capitalOf'), 'Bolivia now gets capital questions: ' + gaps.BO);
