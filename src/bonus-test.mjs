@@ -17,7 +17,7 @@ const before = await A.evaluate(() => { const f = window.__fx, kinds = new Set()
 eq(JSON.stringify(before), JSON.stringify(['capital', 'continent', 'neighbour', 'population']), 'four kinds before 19 November');
 
 // ---- 2. from the 19th: eight kinds, each sound for every country it can be asked about
-const B = await page('2026-11-20');
+const B = await page('2026-11-21');
 const after = await B.evaluate(() => { const f = window.__fx, kinds = new Set(); for (let i = 0; i < 120; i++) f.buildRound(f.deck(f.POOL, 10).slice(0, 10), 'Alex').forEach(r => kinds.add(r.bonus.kind)); return [...kinds].sort(); });
 eq(JSON.stringify(after), JSON.stringify(['borders', 'capital', 'capitalOf', 'continent', 'most', 'neighbour', 'population', 'region']), 'eight kinds from 19 November');
 const bad = await B.evaluate(() => {
@@ -31,7 +31,11 @@ const bad = await B.evaluate(() => {
       if (kind === 'borders' && right !== (c.borders.length === 0 ? 'None' : c.borders.length === 1 ? '1 country' : `${c.borders.length} countries`)) out.push(`${a} borders: ${right}`);
       if (kind === 'region' && (right !== f.SUBS[c.sub] || q.options.some(o => typeof o !== 'string' || /^\d+$/.test(o)))) out.push(`${a} region: ${JSON.stringify(q.options)}`);
       if (kind === 'capitalOf') { const t = f.POOL.map(x => C[x]).find(x => x.name === right); if (!t || t.a2 === a || q.options.includes(c.name) || !q.prompt.startsWith(t.cap + ' is') && !q.prompt.includes(': ' + t.cap + ' is')) out.push(`${a} capitalOf: ${q.prompt} ${JSON.stringify(q.options)}`); if (c.borders.length && q.prompt.includes('neighbour') && !c.borders.includes(t.a2)) out.push(`${a} capitalOf: ${right} is not a neighbour`); }
-      if (kind === 'most') { const pops = q.options.map(nm => f.POOL.map(x => C[x]).find(x => x.name === nm).pop); if (Math.max(...pops) !== pops[q.answer]) out.push(`${a} most: ${right}`); }
+      if (kind === 'most') { const pops = q.options.map(nm => f.POOL.map(x => C[x]).find(x => x.name === nm).pop), r = pops[q.answer], rest = pops.filter((_, i) => i !== q.answer);
+        if (q.options.includes(c.name)) out.push(`${a} most: the flag's own country is a choice`);
+        const good = q.prompt.includes('more people than') ? r > c.pop && rest.every(x => x < c.pop) : q.prompt.includes('fewer people than') ? r < c.pop && rest.every(x => x > c.pop) : Math.max(...pops) === r;
+        if (!good) out.push(`${a} most: ${q.prompt} ${JSON.stringify(q.options)}`); }
+      if (q.options.includes(c.name) && !(kind === 'capital' && c.cap === c.name) && !(kind === 'region' && f.SUBS[c.sub] === c.name)) out.push(`${a} ${kind}: the flag's own country is a choice`);      // those two are never dealt (checked below)
     }
   }
   return out.slice(0, 10);
@@ -42,6 +46,10 @@ const B0 = await page('2026-11-19'); const old = await B0.evaluate(() => { const
 const be = await B.evaluate(() => { const q = window.__fx.BONUS_MAKERS.capitalOf(window.__fx.C.BE); return { p: q.prompt, o: q.options, r: q.options[q.answer] }; });
 assert(be.p.endsWith('is the capital of which neighbour of Belgium?') && !be.o.includes('Belgium') && ['France', 'Germany', 'Netherlands', 'Luxembourg'].includes(be.r), 'from the 20th, Belgium is asked about a neighbour’s capital: ' + JSON.stringify(be));
 const fj = await B.evaluate(() => window.__fx.BONUS_MAKERS.capitalOf(window.__fx.C.FJ).prompt); assert(fj.startsWith('Not far from Fiji: '), 'an island is asked about a nearby country: ' + fj);
+const eg = await B.evaluate(() => { const set = new Set(); for (let i = 0; i < 40; i++) set.add(window.__fx.BONUS_MAKERS.most(window.__fx.C.EG).prompt); return [...set].sort(); });
+eq(JSON.stringify(eg), JSON.stringify(['Which of these countries has fewer people than Egypt?', 'Which of these countries has more people than Egypt?']), 'Egypt is compared both ways');
+const never = await B.evaluate(() => { const f = window.__fx, k = { FM: new Set(), LU: new Set() }; for (let i = 0; i < 300; i++) for (const a of ['FM', 'LU']) k[a].add(f.buildRound([a])[0].bonus.kind); return { FM: [...k.FM], LU: [...k.LU] }; });
+assert(!never.FM.includes('region'), 'Micronesia is never asked which region it is in: ' + never.FM); assert(!never.LU.includes('capital'), 'Luxembourg is never asked its capital: ' + never.LU);
 // the gaps closed: Bolivia gets its capital, Egypt its region
 const gaps = await B.evaluate(() => { const f = window.__fx, n = { BO: new Set(), EG: new Set() }; for (let i = 0; i < 300; i++) for (const a of ['BO', 'EG']) n[a].add(f.buildRound([a]).find(r => r.a2 === a).bonus.kind); return { BO: [...n.BO], EG: [...n.EG] }; });
 assert(gaps.BO.includes('capital') && gaps.BO.includes('capitalOf'), 'Bolivia now gets capital questions: ' + gaps.BO);

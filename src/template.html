@@ -1266,6 +1266,7 @@
   /* Bonus questions. From BQ_FROM there are eight kinds instead of four, wrong answers vary more, and a player is not given
      the kind of question they last had for a country (Today's challenge keeps one set of questions for everyone). */
   const BQ_FROM = '2026-11-19';
+  const MOST_FROM = '2026-11-21';                  // the population comparison leaves the flag's own country out from this day
   const CAPOF_FROM = '2026-11-20';                 // the capital question the other way round asks about a neighbour from this day
   const bqOn = () => todayKey() >= BQ_FROM;
   const OLD_KINDS = ['capital', 'continent', 'population', 'neighbour'];
@@ -1288,7 +1289,7 @@
       // for this country are passed over while another will do.
       const on = bqOn();
       const can = { capital: on ? capOK(c) || a2 === 'BO' : capOK(c), continent: !NO_CONT_Q.has(a2), population: true, neighbour: c.borders.length > 0,
-        capitalOf: todayKey() >= CAPOF_FROM || capOK(c) || a2 === 'BO', borders: true, region: !!SUBS[c.sub] && !CONTS.includes(SUBS[c.sub]), most: true };
+        capitalOf: todayKey() >= CAPOF_FROM || capOK(c) || a2 === 'BO', borders: true, region: !!SUBS[c.sub] && !CONTS.includes(SUBS[c.sub]) && (todayKey() < MOST_FROM || plain(SUBS[c.sub]) !== plain(c.name)), most: true };      // Micronesia is in Micronesia: not asked
       const ok = t => kinds.includes(t) && can[t], last = (seen[a2] || []).slice(-2), fresh = t => ok(t) && !last.includes(t);
       let k = bag.findIndex(fresh);
       if (k < 0) k = bag.findIndex(ok);
@@ -1568,9 +1569,23 @@
       return pack('Region', `Which part of the world is ${the(c)} in?`, SUBS[c.sub], [...same, ...other].slice(0, 3).map(x => SUBS[x]));
     },
     most(c) {
-      // Four countries from the same part of the world with clearly different populations; the largest is the answer.
-      const near = shuffle(POOL.filter(a => a !== c.a2 && (C[a].sub === c.sub || C[a].cont === c.cont))), pick = [c.a2];
-      for (const a of [...near, ...shuffle(POOL)]) { if (pick.length >= 4) break; if (!pick.includes(a) && pick.every(b => Math.max(C[a].pop, C[b].pop) / Math.min(C[a].pop, C[b].pop) >= 1.3)) pick.push(a); }
+      // Until MOST_FROM the flag's own country was one of the four, and sometimes the answer (kept so a day's challenge
+      // stays the same for everyone). From then on it is never a choice: the question compares other countries with it.
+      if (todayKey() < MOST_FROM) {
+        const near = shuffle(POOL.filter(a => a !== c.a2 && (C[a].sub === c.sub || C[a].cont === c.cont))), pick = [c.a2];
+        for (const a of [...near, ...shuffle(POOL)]) { if (pick.length >= 4) break; if (!pick.includes(a) && pick.every(b => Math.max(C[a].pop, C[b].pop) / Math.min(C[a].pop, C[b].pop) >= 1.3)) pick.push(a); }
+        const top = pick.reduce((x, y) => C[y].pop > C[x].pop ? y : x);
+        return pack('Most people', 'Which of these countries has the most people?', C[top].name, pick.filter(a => a !== top).map(a => C[a].name));
+      }
+      const others = [...shuffle(POOL.filter(a => a !== c.a2 && (C[a].sub === c.sub || C[a].cont === c.cont))), ...shuffle(POOL.filter(a => a !== c.a2 && C[a].sub !== c.sub && C[a].cont !== c.cont))];
+      const bigger = others.filter(a => C[a].pop >= c.pop * 1.3), smaller = others.filter(a => C[a].pop <= c.pop / 1.3);
+      // one country on one side of it and three on the other, whichever way round the world allows
+      const ways = shuffle([bigger.length >= 1 && smaller.length >= 3 && 'more', smaller.length >= 1 && bigger.length >= 3 && 'fewer'].filter(Boolean));
+      if (ways[0] === 'more') return pack('Population', `Which of these countries has more people than ${the(c)}?`, C[bigger[0]].name, smaller.slice(0, 3).map(a => C[a].name));
+      if (ways[0] === 'fewer') return pack('Population', `Which of these countries has fewer people than ${the(c)}?`, C[smaller[0]].name, bigger.slice(0, 3).map(a => C[a].name));
+      // the very largest and smallest: four other countries from its part of the world
+      const pick = [];
+      for (const a of others) { if (pick.length >= 4) break; if (pick.every(b => Math.max(C[a].pop, C[b].pop) / Math.min(C[a].pop, C[b].pop) >= 1.3)) pick.push(a); }
       const top = pick.reduce((x, y) => C[y].pop > C[x].pop ? y : x);
       return pack('Most people', 'Which of these countries has the most people?', C[top].name, pick.filter(a => a !== top).map(a => C[a].name));
     }
